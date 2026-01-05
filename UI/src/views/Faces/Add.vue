@@ -1,14 +1,21 @@
 <script setup lang="ts">
-    import { reactive, ref } from 'vue';
-    import { ElMessage } from 'element-plus';
+    import { reactive, ref, onMounted, computed } from 'vue';
+    import { ElMessage, ElMessageBox } from 'element-plus';
     import AccountAuthForm from '../../components/AccountAuthForm.vue';
     import { open } from '@tauri-apps/plugin-dialog';
     import { invoke } from '@tauri-apps/api/core';
-    import { formatObjectString, handleLocalAccount } from '../../utils/function'
+    import { formatObjectString, removeFace } from '../../utils/function'
     import { openUrl } from '@tauri-apps/plugin-opener';
+    import { useRoute, useRouter } from 'vue-router';
+    import { info, error as errorLog, warn } from '@tauri-apps/plugin-log';
+    import { useFacesStore } from '../../stores/faces';
+
+    const route = useRoute();
+    const router = useRouter();
+    const facesStore = useFacesStore();
 
     const faceName = ref('');
-    const threshold = ref(50);
+    const threshold = ref(40);
     // 显示的图片
     const capturedImage = ref('');
     // 这是用来保存的，不要显示
@@ -23,6 +30,10 @@
     const verifyingStreamImage = ref('');
     const matchConfidence = ref(0);
     const isProcessing = ref(false);
+    // 修改时的面容数据，用于最后提交的判断
+    let editFaceData = null;
+    // 修改面容时，是否修改了图片
+    let isEditFaceImage = false;
     // const faceDetectionThreshold = ref(90); // cy:  人脸识别度，暂时废弃，等设置页面写好在说
 
     let authForm = reactive({
@@ -31,12 +42,39 @@
         password: ''
     });
 
-    // 获取当前用户名
-    invoke('get_now_username').then((data)=>{
-        if(data.code == 200){
-            authForm.username = data.data.username;
+    const isEditMode = computed(() => route.query.mode === 'edit');
+    const targetId = route.query.id;
+
+    onMounted(async () => {
+        if (isEditMode.value) {
+            editFaceData = facesStore.getFaceById(targetId);
+            if(editFaceData){
+                // 添加账户信息
+                authForm.username = editFaceData.user_name;
+                authForm.password = editFaceData.user_pwd;
+                authForm.accountType = editFaceData.account_type;
+                // 添加其他信息
+                faceName.value = editFaceData.json_data.alias;
+                threshold.value = editFaceData.json_data.threshold;
+                // 添加人脸信息
+                loadFaceFormPath(localStorage.getItem("exe_dir") + "\\faces\\"+editFaceData.face_token+".faceimg").catch((error)=>{
+                    const info = formatObjectString("载入图片失败：", error);
+                    errorLog(info);
+                    ElMessage.error(info);
+                })
+            }else{
+                ElMessage.warning('未找到该人脸数据');
+                router.push('/faces');
+            }
+        } else {
+            // 获取当前用户名
+            invoke('get_now_username').then((data)=>{
+                if(data.code == 200){
+                    authForm.username = data.data.username;
+                }
+            })
         }
-    })
+    });
 
     const handleSelectFile = async () => {
         try {
@@ -50,19 +88,26 @@
 
             isProcessing.value = true;
             
-            const result = await invoke("check_face_from_img", { imgPath: selected });
-            
-            capturedImage.value = result.data.display_base64;
-            rawImageForSystem = result.data.raw_base64;
+            await loadFaceFormPath(selected);
 
-            ElMessage.success('图片载入成功');
+            isEditFaceImage = true;
         } catch (error) {
-            ElMessage.error(formatObjectString(error));
-            console.error(error);
+            const info = formatObjectString("文件选择失败：", error);
+            errorLog(info);
+            ElMessage.error(info);
         } finally {
             isProcessing.value = false;
         }
     };
+
+    async function loadFaceFormPath(path){
+        const result = await invoke("check_face_from_img", { imgPath: path });
+            
+        capturedImage.value = result.data.display_base64;
+        rawImageForSystem = result.data.raw_base64;
+
+        ElMessage.success('图片载入成功');
+    }
 
     const startCamera = () => {
         invoke("open_camera").then(()=>{
@@ -70,8 +115,9 @@
             isLoopRunning = true;
             streamLoop();
         }).catch((error)=>{
+            const info = formatObjectString("摄像头开启失败：", error);
+            errorLog(info);
             ElMessage.error(formatObjectString(error));
-            console.error(error);
         });
     };
 
@@ -102,18 +148,23 @@
             // 继续下一帧
             requestAnimationFrame(streamLoop);
         } catch (error) {
-            const info = formatObjectString(error);
+            const info = formatObjectString("RAF循环出错：" ,error);
             if(info.includes("未检测到人脸")){
                 // 这个可以继续，并且不用显示错误
                 requestAnimationFrame(streamLoop);
                 return;
             }
+            errorLog(info);
             ElMessage.error(info);
         }
     };
 
     const confirmCapture = () => {
         stopCamera().then(()=>{
+            if(capturedImage.value && rawImageForSystem){
+                isEditFaceImage = true;
+            }
+
             isCameraStreaming.value = false;
         }).catch(()=>{});
     };
@@ -132,8 +183,9 @@
             invoke("stop_camera").then(()=>{
                 resolve();
             }).catch((error)=>{
-                ElMessage.error(formatObjectString(error));
-                console.error(error);
+                const info = formatObjectString("摄像头关闭失败：", error);
+                errorLog(info);
+                ElMessage.error(info);
                 reject();
             });
         })
@@ -147,8 +199,9 @@
                 isLoopRunning = true;
                 streamLoop();
             }).catch((error)=>{
-                ElMessage.error(formatObjectString(error));
-                console.error(error);
+                const info = formatObjectString("摄像头开启失败：", error);
+                errorLog(info);
+                ElMessage.error(info);
             });
         } else {
             stopCamera().then(()=>{
@@ -157,7 +210,7 @@
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!authForm.username || !authForm.password) {
             ElMessage.warning('请填写完整的账号密码信息')
             return;
@@ -168,16 +221,109 @@
             return;
         }
 
+        // 判断置信度是否在合理的范围内
+        try {
+            let messageBoxText = null;
+            if(threshold.value < 36){
+                messageBoxText = '置信度小于OpenCV推荐的 36%，误判为同一人的可能性很高，是否继续？'
+            } else if(threshold.value > 85) {
+                messageBoxText = '置信度过高可能会导致误判，是否继续？'
+            }
+
+            if(messageBoxText){
+                await ElMessageBox.confirm(messageBoxText, '警告',{
+                    confirmButtonText: '继续',
+                    cancelButtonText: '取消',
+                    type: 'warning',
+                });
+            }
+            
+        } catch (error) {
+            return;
+        }
+    
+        if(isEditMode.value){
+            // 如果是修改，判断数据是否完全一致
+            if(
+                authForm.username == editFaceData.user_name &&
+                authForm.password == editFaceData.user_pwd &&
+                authForm.accountType == editFaceData.account_type &&
+                faceName.value == editFaceData.json_data.alias &&
+                threshold.value == editFaceData.json_data.threshold &&
+                !isEditFaceImage
+            ){
+                // 没有任何变化，直接成功
+                ElMessage.success('修改成功！');
+                router.push('/faces');
+                return;
+            }
+        }
+
         isProcessing.value = true;
 
-        invoke("save_face_registration", {name: faceName.value || '', referenceBase64: rawImageForSystem.split(',')[1]}).then((result)=>{
-            console.log('特征已保存至文件:', result);
-        }).catch((error)=>{
-            ElMessage.error(formatObjectString(error));
-            console.error(error);
-        }).finally(()=>{
+        let face_token = "";
+
+        if(isEditMode.value && !isEditFaceImage){
+            // 如果编辑模式中，没有修改图片，则不用重新存储面容特征
+            face_token = editFaceData.face_token;
+        }else{
+            // 如果非编辑模式，或者编辑模式修改了图片
+            try {
+                const result = await invoke("save_face_registration", {name: faceName.value || '', referenceBase64: rawImageForSystem.split(',')[1]});
+                face_token = result.data.file_name;
+            } catch (error) {
+                const info = formatObjectString("存储面容失败：", error);
+                errorLog(info);
+                ElMessage.error(info);
+                isProcessing.value = false;
+                return;
+            }
+        }
+
+        try {
+
+            if(!isEditMode.value){
+                await facesStore.addFace({
+                    "user_name": authForm.username,
+                    "user_pwd": authForm.password,
+                    "account_type": authForm.accountType,
+                    "face_token": face_token,
+                    "json_data": JSON.stringify({
+                        threshold: threshold.value,
+                        alias: faceName.value || '',
+                        view: true
+                    })
+                });
+            } else {
+                await facesStore.editFace({
+                    "user_name": authForm.username,
+                    "user_pwd": authForm.password,
+                    "account_type": authForm.accountType,
+                    "face_token": face_token,
+                    "json_data": JSON.stringify({
+                        threshold: threshold.value,
+                        alias: faceName.value || '',
+                        view: editFaceData.json_data.view ? editFaceData.json_data.view : true
+                    })
+                }, targetId);
+
+                if(isEditFaceImage){
+                    // 如果信息存储完成，并且修改了图片，删除旧的面容特征
+                    // 删除不成功，也不影响使用，所以不用退出
+                    removeFace(editFaceData.face_token, "删除旧面容");
+                }
+            }
+            
+            info(`${authForm.username} 面容${isEditMode.value ? '修改' : '添加'}成功！`);
+            ElMessage.success(isEditMode.value ? '修改成功' : '添加成功');
+            router.push('/faces');
+        } catch (error) {
+            // 如果失败 删除上面生成的面容图片和特征文件
+            removeFace(face_token);
+            ElMessage.error(error);
+        } finally {
             isProcessing.value = false;
-        });
+        }
     };
 </script>
 
@@ -268,21 +414,31 @@
                         </el-form-item>
 
                         <el-form-item label="判定阈值 (置信度)">
-                            <el-slider v-model="threshold" :min="20" :max="100" />
-                            <div class="tip">
+                            <div class="slider-box">
+                                <el-slider v-model="threshold" :min="20" :max="100" style="width: 100%;"/>
+                                <el-tooltip
+                                    content="<span>OpenCV 官网建议 <strong>≥ 0.363</strong> (约 <strong>36%</strong>) <br />单击以打开 OpenCV 文档</span>"
+                                    placement="top-end"
+                                    raw-content
+                                >
+                                    <el-icon class="question-icon" @click="openUrl('https://docs.opencv.org/4.x/d0/dd4/tutorial_dnn_face.html')"><QuestionFilled /></el-icon>
+                                </el-tooltip>
+                            </div>
+                            <!-- 26-01-04 感觉tip占用空间点有大，尽量让内容在一屏中 -->
+                            <!-- <div class="tip">
                                 当前阈值: <b style="color: #606266; margin: 0 4px;">{{ threshold }}%</b>
                                 <span @click="openUrl('https://docs.opencv.org/4.x/d0/dd4/tutorial_dnn_face.html')">
                                     OpenCV 官网建议 ≥ 0.363 (约 36%)
                                 </span>
-                            </div>
+                            </div> -->
                         </el-form-item>
 
                         <el-divider>关联系统账户</el-divider>
-                        <AccountAuthForm v-model="authForm" />
+                        <AccountAuthForm v-model="authForm" :small="true" :customTips="'此密码仅用于 DLL 调起 WinLogon 认证<br />不会上传至任何云端<br />注意：<strong>当前使用明文存储</strong>'"/>
 
                         <div class="footer-btns">
                             <el-button type="success" size="large" @click="handleSave" :disabled="!capturedImage || isCameraStreaming" :loading="isProcessing">
-                                保存并录入系统
+                                {{ isEditMode ? '确认修改' : '保存并录入系统' }}
                             </el-button>
                         </div>
                     </el-form>
@@ -359,6 +515,7 @@
         background: rgba(64, 158, 255, 0.5);
         box-shadow: 0 0 10px #409eff;
         animation: scan 2s infinite ease-in-out;
+        z-index: 2;
     }
 
     .confidence-tag {
@@ -429,6 +586,18 @@
     .tip span:hover {
         color: #66b1ff;
         text-decoration: none;
+    }
+
+    .slider-box{
+        width: 100%;
+        display: flex;
+        align-items: center;
+    }
+
+    .question-icon{
+        margin-left: 10px;
+        font-size: 16px;
+        cursor: pointer;
     }
 
     @keyframes scan {

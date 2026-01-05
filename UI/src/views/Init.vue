@@ -6,6 +6,7 @@
     import { useOptionsStore } from "../stores/options";
     import AccountAuthForm from '../components/AccountAuthForm.vue';
     import {handleLocalAccount, formatObjectString} from '../utils/function'
+    import { info, error as errorLog, warn } from '@tauri-apps/plugin-log';
 
     const checks = reactive({ 
         camera: false, 
@@ -55,6 +56,7 @@
             checks.camera = true;
             ElMessage.success('环境检查通过');
         }).catch((e)=>{
+            errorLog(formatObjectString("环境自检失败：", e));
             ElMessage.error(formatObjectString(e));
         }).finally(()=>{
             checks.loading = false;
@@ -88,6 +90,7 @@
         }).catch((error)=>{
             isDeploying.value = false;
             deployStatus.value = 'exception';
+            errorLog(formatObjectString("部署失败：", error));
             ElMessageBox.alert(error, '部署失败', { type: 'error' });
         });
     };
@@ -117,6 +120,7 @@
                             }
                         })
                     }).catch((error)=>{
+                        errorLog(formatObjectString("测试失败：", error));
                         ElMessageBox.alert(formatObjectString(error), '测试失败', {
                             confirmButtonText: '确定'
                         });
@@ -135,7 +139,17 @@
         <el-card class="init-card">
             <template #header>
                 <div class="card-header">
-                    <span>系统初始化向导</span>
+                    <div class="card-tool">
+                        <el-button 
+                            v-if="initialized" 
+                            icon="ArrowLeft" 
+                            circle 
+                            size="small"
+                            @click="$router.back()"
+                            class="back-btn"
+                        />
+                        <span>系统初始化向导</span>
+                    </div>
                     <el-tag :type="initialized ? 'success' : 'warning'">
                         {{ initialized ? '已激活' : '待配置' }}
                     </el-tag>
@@ -182,8 +196,7 @@
                         </div>
                         <el-button type="danger" :loading="isDeploying" @click="startDeployment"
                             v-if="deployProgress === 0">执行部署</el-button>
-                        <!-- <el-button type="primary" :disabled="deployProgress < 100" @click="handleNextStep">下一步</el-button> -->
-                        <el-button type="primary"  @click="handleNextStep">下一步</el-button>
+                        <el-button type="primary" :disabled="deployProgress < 100" @click="handleNextStep">下一步</el-button>
                     </div>
                 </div>
 
@@ -251,4 +264,14 @@
     .progress-wrapper {
         margin: 30px 0;
     }
+
+    .back-btn {
+		transition: all 0.2s;
+        margin-right: 10px;
+	}
+
+	.back-btn:hover {
+		background-color: #ecf5ff;
+		transform: translateX(-2px);
+	}
 </style>

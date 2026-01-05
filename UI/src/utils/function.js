@@ -1,3 +1,5 @@
+import { useFile } from "../hook/useFile";
+
 /**
  * 格式化信息为字符串
  * * - 支持无限数量的参数
@@ -91,6 +93,27 @@ function handleLocalAccount(authForm, add){
     }
 }
 
+/**
+ * 删除面容特征和图片文件
+ * @param {string} face_name 面容名称
+ * @param {string} tips 提示信息
+ */
+function removeFace(face_name, tips = "删除面容"){
+    const { reomve } = useFile();
+
+    reomve("faces\\" + face_name + ".faceimg").catch((error)=>{
+        const info = formatObjectString(tips + "图片失败：", error);
+        warn(info);
+        ElMessage.warning(info);
+    });
+
+    reomve("faces\\" + face_name + ".face").catch((error)=>{
+        const info = formatObjectString(tips + "特征失败：", error);
+        warn(info);
+        ElMessage.warning(info);
+    });
+}
+
 export {
-    formatObjectString, getCurrentDateTime, getFileNameByWindows, handleLocalAccount
+    formatObjectString, getCurrentDateTime, getFileNameByWindows, handleLocalAccount, removeFace
 }

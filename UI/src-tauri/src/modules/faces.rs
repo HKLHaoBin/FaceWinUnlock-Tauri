@@ -1,5 +1,9 @@
-use std::io::{Read, Write};
+use std::{
+    fs,
+    io::{Read, Write},
+};
 
+use crate::{utils::custom_result::CustomResult, AppState};
 use base64::{engine::general_purpose, Engine};
 use opencv::{
     core::{Mat, Point, Ptr, Rect, Scalar, Size, Vector},
@@ -7,10 +11,9 @@ use opencv::{
     objdetect::{FaceDetectorYN, FaceRecognizerSF, FaceRecognizerSF_DisType},
     prelude::*,
 };
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::Manager;
-use crate::{utils::custom_result::CustomResult, AppState};
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -26,7 +29,7 @@ impl FaceDescriptor {
         let mut feature_vec: Vec<f32> = vec![0.0f32; feature_mat.total()];
         let data = feature_mat.data_typed::<f32>()?;
         feature_vec.copy_from_slice(data);
-    
+
         Ok(FaceDescriptor {
             name: name.to_string(),
             feature: feature_vec,
@@ -37,14 +40,14 @@ impl FaceDescriptor {
     pub fn to_mat(&self) -> Result<Mat, Box<dyn std::error::Error>> {
         // 从切片创建原始 Mat (默认为 N 行 1 列)
         let m = Mat::from_slice(&self.feature)?;
-        
+
         // 变换形状为 1 行 128 列
         // reshape 返回的是 Result<BoxedRef<Mat>, ...>
         let m_reshaped = m.reshape(1, 1)?;
-        
+
         // 使用 try_clone() 进行深拷贝，转回独立的 Mat 对象
         let final_mat = m_reshaped.try_clone()?;
-        
+
         Ok(final_mat)
     }
 }
@@ -181,7 +184,7 @@ pub async fn verify_face(
         .map_err(|e| CustomResult::error(Some(format!("特征匹配失败: {}", e)), None))?;
 
     let mut result_mat = frame.clone();
-    if let Ok(resize_mat) = resize_mat(&frame, 1270.0) {
+    if let Ok(resize_mat) = resize_mat(&frame, 800.0) {
         result_mat = resize_mat;
     }
     Ok(CustomResult::success(
@@ -204,13 +207,15 @@ pub async fn save_face_registration(
     reference_base64: String,
 ) -> Result<CustomResult, CustomResult> {
     // 获取软件数据目录并创建 faces 文件夹
-    let mut path = handle.path().resolve(
-        "faces",
-        tauri::path::BaseDirectory::Resource,
-    ).map_err(|e| CustomResult::error(Some(format!("获取软件数据目录失败: {}", e)), None))?;
+    let path = handle
+        .path()
+        .resolve("faces", tauri::path::BaseDirectory::Resource)
+        .map_err(|e| CustomResult::error(Some(format!("获取软件数据目录失败: {}", e)), None))?;
 
     if !path.exists() {
-        std::fs::create_dir_all(&path).map_err(|e| CustomResult::error(Some(format!("创建 faces 文件夹失败: {}", e)), None))?;
+        std::fs::create_dir_all(&path).map_err(|e| {
+            CustomResult::error(Some(format!("创建 faces 文件夹失败: {}", e)), None)
+        })?;
     }
 
     // 解码图片
@@ -244,12 +249,43 @@ pub async fn save_face_registration(
     let descriptor = FaceDescriptor::from_mat(&name, &feature_mat)
         .map_err(|e| CustomResult::error(Some(format!("特征描述失败: {}", e)), None))?;
 
-    let file_name = format!("{}.face", Uuid::new_v4());
-    path.push(&file_name);
+    let base_name = Uuid::new_v4();
 
-    save_face_data(&path, &descriptor).map_err(|e| CustomResult::error(Some(format!("保存特征数据失败: {}", e)), None))?;
+    // 保存特征
+    let feature_name = format!("{}.face", base_name);
+    let mut feature_path = path.clone();
+    feature_path.push(feature_name);
+    save_face_data(&feature_path, &descriptor)
+        .map_err(|e| CustomResult::error(Some(format!("保存特征数据失败: {}", e)), None))?;
 
-    Ok(CustomResult::success(None, Some(json!({"file_name": file_name}))))
+    // 保存图片
+    let file_name = format!("{}.faceimg", base_name);
+    let mut file_path = path.clone();
+    file_path.push(file_name);
+    let resize_mat: Mat = resize_mat(&ref_img, 800.0)
+        .map_err(|e| CustomResult::error(Some(format!("图片缩放失败: {}", e)), None))?;
+
+    let mut buf = Vector::<u8>::new();
+    imgcodecs::imencode(".jpg", &resize_mat, &mut buf, &Vector::new()).unwrap();
+    fs::write(file_path, buf).map_err(|e| {
+        // 图片保存失败删除面容特征
+        if let Err(err) = fs::remove_file(feature_path.clone()) {
+            CustomResult::error(
+                Some(format!(
+                    "特征文件删除失败: {} 文件地址：{:?}",
+                    err, feature_path
+                )),
+                None,
+            )
+        } else {
+            CustomResult::error(Some(format!("图片保存失败: {}", e)), None)
+        }
+    })?;
+
+    Ok(CustomResult::success(
+        None,
+        Some(json!({"file_name": base_name})),
+    ))
 }
 
 // 提取特征点
@@ -314,7 +350,15 @@ fn resize_mat(src: &Mat, max_dim: f32) -> Result<Mat, String> {
             (size.width as f32 * scale) as i32,
             (size.height as f32 * scale) as i32,
         );
-        imgproc::resize(&src, &mut resize_mat, new_size, 0.0, 0.0, imgproc::INTER_AREA).ok();
+        imgproc::resize(
+            &src,
+            &mut resize_mat,
+            new_size,
+            0.0,
+            0.0,
+            imgproc::INTER_AREA,
+        )
+        .ok();
     } else {
         resize_mat = src.clone();
     }
@@ -328,7 +372,7 @@ fn detect_and_format(
     src: Mat,
 ) -> Result<CaptureResponse, String> {
     // 等比例缩放
-    let raw_mat = resize_mat(&src, 1270.0)?;
+    let raw_mat = resize_mat(&src, 800.0)?;
 
     // 检测
     let mut display_mat = raw_mat.clone(); // 用于显示的副本
@@ -405,7 +449,10 @@ fn mat_to_base64(mat: &Mat) -> String {
 }
 
 // 保存人脸数据到文件
-fn save_face_data(path: &std::path::PathBuf, data: &FaceDescriptor) -> Result<(), Box<dyn std::error::Error>> {
+fn save_face_data(
+    path: &std::path::PathBuf,
+    data: &FaceDescriptor,
+) -> Result<(), Box<dyn std::error::Error>> {
     let encoded: Vec<u8> = bincode::serialize(data)?;
     let mut file = std::fs::File::create(path)?;
     file.write_all(&encoded)?;

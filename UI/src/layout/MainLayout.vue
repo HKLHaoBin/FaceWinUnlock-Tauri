@@ -29,7 +29,7 @@
                     <span>仪表盘</span>
                 </el-menu-item>
 
-                <el-menu-item index="/faces/add">
+                <el-menu-item index="/faces">
                     <el-icon>
                         <User />
                     </el-icon>
@@ -58,6 +58,20 @@
         </el-aside>
 
         <el-container>
+			<el-header class="global-header" height="50px">
+				<div class="left-section">
+					<el-button 
+						v-if="$route.path !== '/'" 
+						icon="ArrowLeft" 
+						circle 
+						size="small"
+						@click="$router.back()"
+						class="back-btn"
+					/>
+					<span class="page-title">{{ $route.meta.title || '面容识别系统' }}</span>
+				</div>
+				<div class="right-section"></div>
+			</el-header>
             <el-main class="main-content">
                 <router-view v-slot="{ Component }">
                     <transition name="fade-transform" mode="out-in">
@@ -71,6 +85,7 @@
 
 <style scoped>
 	.layout-container {
+		display: flex;
 		height: 100vh;
 		background-color: #f9f9f9;
 	}
@@ -113,6 +128,36 @@
 	.main-content {
 		padding: 30px;
 		overflow-y: auto;
+	}
+
+	.global-header {
+		background-color: #fff;
+		border-bottom: 1px solid #e6e6e6;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0 20px;
+	}
+
+	.left-section {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.back-btn {
+		transition: all 0.2s;
+	}
+
+	.back-btn:hover {
+		background-color: #ecf5ff;
+		transform: translateX(-2px);
+	}
+
+	.page-title {
+		font-size: 14px;
+		font-weight: 600;
+		color: #606266;
 	}
 
 	/* 页面切换动画 */

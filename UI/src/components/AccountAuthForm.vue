@@ -15,6 +15,10 @@
         customTips: {
             type: String,
             default: ''
+        },
+        small: {
+            type: Boolean,
+            default: false
         }
     });
 
@@ -48,10 +52,23 @@
             </el-form-item>
 
             <el-form-item label="系统登录密码">
+                <template #label>
+                    <div class="label-box">
+                        <span>系统登录密码</span>
+                        <el-tooltip
+                            v-if="small"
+                            :content="`<span>${customTips || defaultTips}</span>`"
+                            placement="top-end"
+                            raw-content
+                        >
+                            <el-icon class="question-icon"><WarnTriangleFilled /></el-icon>
+                        </el-tooltip>
+                    </div>
+                </template>
                 <el-input v-model="formData.password" type="password" show-password placeholder="请输入对应的登录密码" />
             </el-form-item>
 
-            <div class="auth-tips">
+            <div class="auth-tips" v-if="!small">
                 <el-icon>
                     <InfoFilled />
                 </el-icon>
@@ -89,5 +106,16 @@
     .auth-tips .el-icon {
         margin-top: 2px;
         flex-shrink: 0;
+    }
+
+    .label-box{
+        display: flex;
+        align-items: center;
+    }
+
+    .question-icon{
+        font-size: 18px;
+        margin-left: 5px;
+        cursor: pointer;
     }
 </style>

@@ -38,6 +38,8 @@ winreg = "0.55.0"
 tauri-plugin-dialog = "2"
 base64 = "0.22.1"
 uuid = { version = "1.19.0", features = ["v4", "serde"] }
+tauri-plugin-log = "2"
+tauri-plugin-fs = "2"
 
 [dependencies.tauri-plugin-sql]
 features = ["sqlite"] # or "postgres", or "mysql"

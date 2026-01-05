@@ -11,14 +11,18 @@ use windows::Win32::{
 pub mod modules;
 pub mod proc;
 pub mod utils;
-use modules::faces::{check_face_from_img, check_face_from_camera, verify_face, save_face_registration};
+use modules::faces::{
+    check_face_from_camera, check_face_from_img, save_face_registration, verify_face,
+};
 use modules::init::{check_admin_privileges, check_camera_status, deploy_core_components};
 use opencv::{
     core::Ptr,
-    objdetect::{FaceDetectorYN, FaceRecognizerSF}, videoio::VideoCapture,
+    objdetect::{FaceDetectorYN, FaceRecognizerSF},
+    videoio::VideoCapture,
 };
 use proc::wnd_proc_subclass;
-use utils::api::{get_now_username, init_model, test_win_logon, open_camera, stop_camera};
+use tauri_plugin_log::{Target, TargetKind};
+use utils::api::{get_now_username, init_model, open_camera, stop_camera, test_win_logon};
 
 pub struct OpenCVResource<T> {
     pub inner: T,
@@ -35,14 +39,28 @@ pub struct AppState {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
+        // 对话框
         .plugin(tauri_plugin_dialog::init())
+        // 注册状态管理
         .manage(AppState {
             detector: RwLock::new(None),
             recognizer: RwLock::new(None),
-            camera: RwLock::new(None)
+            camera: RwLock::new(None),
         })
+        // 文件系统插件
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
+        // 注册日志插件
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets([
+                    Target::new(TargetKind::Stdout),
+                    Target::new(TargetKind::LogDir { file_name: None }),
+                    Target::new(TargetKind::Webview),
+                ])
+                .build(),
+        )
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
             #[cfg(debug_assertions)] // 仅在调试(debug)版本中包含此代码

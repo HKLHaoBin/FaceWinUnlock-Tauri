@@ -56,7 +56,11 @@ npm run tauri dev
 npm run tauri build
 ```
 
-
+5. **资源文件**
+- [FaceWinUnlock-Tauri.dll](https://github.com/zs1083339604/Winlogon/releases/tag/v1.0)，下载1.0.zip，解压后得到DLL
+- [face_detection_yunet_2023mar.onnx](https://github.com/opencv/opencv_zoo/blob/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx)
+- [face_recognition_sface_2021dec.onnx](https://github.com/opencv/opencv_zoo/blob/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx)
+- [opencv_world4120.dll](https://github.com/opencv/opencv/releases/tag/4.12.0)，需要下载opencv源代码进行编译，[编译教程点这](https://www.cnblogs.com/-CO-/p/18075315)
 
 ## 📂 项目结构
 
@@ -84,4 +88,3 @@ npm run tauri build
 - 面容添加页面包含多次重复的特征点提取操作
 - 面容添加页面应添加摄像设备选择、人脸阈值等内容
 - 当前用户名密码使用明文存储
-- 日志放sqlite还是文件中有待商榷

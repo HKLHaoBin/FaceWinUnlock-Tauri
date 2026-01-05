@@ -13,6 +13,24 @@
     "sql:default",
     "sql:allow-execute",
     "dialog:default",
-    "opener:allow-default-urls"
+    "opener:allow-default-urls",
+    "log:default",
+    "fs:default",
+    {
+      "identifier": "fs:allow-exists",
+      "allow": [{ "path": "$RESOURCE/faces/**" }]
+    },
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [{ "path": "$RESOURCE/faces/**" }]
+    },
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [{ "path": "$RESOURCE/faces/**" }]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [{ "path": "$RESOURCE/faces/**" }]
+    }
   ]
 }

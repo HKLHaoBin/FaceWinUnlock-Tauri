@@ -14,15 +14,18 @@ const routes = [
 			{
 				path: '',
 				name: 'Dashboard',
-				component: Dashboard
+				component: Dashboard,
+				meta: { title: '控制仪表盘' }
 			},{
-				path: 'face',
+				path: 'faces',
 				name: 'FaceList',
-				component: List
+				component: List,
+				meta: { title: '面容库管理' }
 			},{
 				path: 'faces/add',
 				name: 'FaceAdd',
-				component: Add
+				component: Add,
+				meta: { title: '录入/编辑面容' }
 			}
 		]
 	}

@@ -3,7 +3,8 @@ use std::{ffi::OsStr, os::windows::ffi::OsStrExt};
 use crate::{utils::custom_result::CustomResult, AppState, OpenCVResource};
 use opencv::{
     core::{Mat, Size},
-    objdetect::{FaceDetectorYN, FaceRecognizerSF}, videoio::{VideoCapture, VideoCaptureTrait, VideoCaptureTraitConst},
+    objdetect::{FaceDetectorYN, FaceRecognizerSF},
+    videoio::{VideoCapture, VideoCaptureTrait, VideoCaptureTraitConst},
 };
 use serde_json::json;
 use tauri::Manager;
@@ -112,21 +113,26 @@ pub async fn init_model(
 // 打开摄像头
 #[tauri::command]
 pub async fn open_camera(state: tauri::State<'_, AppState>) -> Result<CustomResult, CustomResult> {
-
     let mut cam_lock = state.camera.write().await;
     // 如果摄像头没打开
     if cam_lock.is_none() {
         let mut cam = VideoCapture::new(0, opencv::videoio::CAP_ANY)
             .map_err(|e| CustomResult::error(Some(format!("摄像头打开失败: {}", e)), None))?;
 
-        let is_opened = cam.is_opened().map_err(|e| CustomResult::error(Some(format!("检查状态失败: {}", e)), None))?;
+        let is_opened = cam
+            .is_opened()
+            .map_err(|e| CustomResult::error(Some(format!("检查状态失败: {}", e)), None))?;
         if !is_opened {
-            return Err(CustomResult::error(Some("摄像头打开失败，设备可能被占用".to_string()), None));
+            return Err(CustomResult::error(
+                Some("摄像头打开失败，设备可能被占用".to_string()),
+                None,
+            ));
         }
 
         // 读取一帧 激活摄像头
         let mut frame = Mat::default();
-        cam.read(&mut frame).map_err(|e| CustomResult::error(Some(format!("激活失败: {}", e)), None))?;
+        cam.read(&mut frame)
+            .map_err(|e| CustomResult::error(Some(format!("激活失败: {}", e)), None))?;
 
         *cam_lock = Some(OpenCVResource { inner: cam });
     }

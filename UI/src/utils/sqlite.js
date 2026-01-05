@@ -1,5 +1,6 @@
 import Database from '@tauri-apps/plugin-sql';
 import { formatObjectString } from './function'
+import { info, error as errorLog, warn } from '@tauri-apps/plugin-log';
 
 let db = null;
 let isConnect = false;
@@ -19,18 +20,6 @@ const databseTable = [
             { name: 'lastTime', type: 'TEXT', defaultValue: "datetime('now', 'localtime')" }
         ]
     },{
-        // 日志
-        name: 'logs',
-        columns: [
-            { name: 'id', type: 'INTEGER', primaryKey: true, autoIncrement: true, notNull: true },
-            // INFO, WARN, ERROR
-            { name: 'level', type: 'TEXT', notNull: true },
-            // 日志内容
-            { name: 'content', type: 'TEXT', notNull: true },
-            // 创建时间
-            { name: 'createTime', type: 'TEXT', defaultValue: "datetime('now', 'localtime')" }
-        ]
-    },{
         // 面容表
         name: 'faces',
         columns: [
@@ -39,12 +28,16 @@ const databseTable = [
             { name: 'user_name', type: 'TEXT', notNull: true },
             // 加密后的Windows密码（由DLL用来调起登录）
             { name: 'user_pwd', type: 'TEXT', notNull: true },
-            // 人脸特征标识符或存储路径
+            // windows账户类型
+            { name: 'account_type', type: 'TEXT', notNull: true },
+            // 人脸特征标识符和图片的存储路径
+            // 特征是 .face 图片是 .faceimg
             { name: 'face_token', type: 'TEXT', notNull: true },
-            // 面容置信度
-            { name: 'threshold', type: 'INTEGER', notNull: true },
-            // 面容别名
-            { name: 'alias', type: 'TEXT' },
+            // 其余JSON数据，便于随时添加
+            // alias 面容别名
+            // threshold 置信度
+            // view 是否在列表页显示图片缩略图
+            { name: 'json_data', type: 'TEXT', notNull: true },
             // 创建时间
             { name: 'createTime', type: 'TEXT', defaultValue: "datetime('now', 'localtime')" }
         ]
@@ -92,7 +85,7 @@ async function connect() {
         // 不管在何时发生了错误，直接退出
         db = null;
         isConnect = false;
-        console.log(formatObjectString("数据库连接或初始化失败: ", error));
+        errorLog(formatObjectString("数据库连接或初始化失败: ", error));
         throw error;
     }
 }
@@ -118,7 +111,7 @@ async function initTableSchema(tableDef) {
         // 表不存在，直接创建
         const createSql = generateCreateSql(tableDef);
         await db.execute(createSql);
-        console.log(`[Schema] 表 '${tableName}' 不存在，已创建`);
+        warn(`[Schema] 表 '${tableName}' 不存在，已创建`);
         return;
     }
 
@@ -139,11 +132,11 @@ async function initTableSchema(tableDef) {
         const existingType = existingColMap.get(expectedCol.name);
 
         if (!existingType) {
-            // 列缺失
+            // 列缺失：可以简单添加（使用 ALTER TABLE）
             columnsToAdd.push(expectedCol);
         } else if (existingType !== expectedCol.type) {
             // 列类型不匹配：必须重建表
-            console.log(`[Schema] 表 '${tableName}' 的列 '${expectedCol.name}' 类型不匹配 (期望: ${expectedCol.type}, 现有: ${existingType})。将重建表`);
+            warn(`[Schema] 表 '${tableName}' 的列 '${expectedCol.name}' 类型不匹配 (期望: ${expectedCol.type}, 现有: ${existingType})。将重建表`);
             shouldRebuild = true;
             break; // 只要有一个列需要重建，就退出循环
         }
@@ -153,7 +146,7 @@ async function initTableSchema(tableDef) {
     if (!shouldRebuild) {
         for (const existingCol of existingColumns) {
             if (!expectedColumns.some(e => e.name === existingCol.name)) {
-                console.log(`[Schema] 表 '${tableName}' 存在多余列 '${existingCol.name}'。将重建表`);
+                warn(`[Schema] 表 '${tableName}' 存在多余列 '${existingCol.name}'。将重建表`);
                 shouldRebuild = true;
                 break;
             }
@@ -163,7 +156,7 @@ async function initTableSchema(tableDef) {
     // 执行 Schema 修正
     if (shouldRebuild) {
         await rebuildTable(tableName, tableDef);
-        console.log(`[Schema] 表 '${tableName}' 已重建以同步结构`);
+        info(`[Schema] 表 '${tableName}' 已重建以同步结构`);
     } else if (columnsToAdd.length > 0) {
         // 只添加缺少的列 (ALTER TABLE ADD COLUMN)
         for (const col of columnsToAdd) {
@@ -174,14 +167,14 @@ async function initTableSchema(tableDef) {
             }
             // 注意：SQLite 不允许在 ADD COLUMN 时设置 NOT NULL (除非表为空)
             if (def.notNull && def.defaultValue === undefined) {
-                console.log(`[Schema] 警告: 无法为表 '${tableName}' 添加非空列 '${def.name}'，请手动处理或重建`);
+                warn(`[Schema] 警告: 无法为表 '${tableName}' 添加非空列 '${def.name}'，请手动处理或重建`);
             } else if (def.notNull && def.defaultValue !== undefined) {
                 // 如果有默认值，并且是 NOT NULL，则可以添加
                 alterSql = `ALTER TABLE ${tableName} ADD COLUMN ${def.name} ${def.type} NOT NULL DEFAULT (${def.defaultValue})`;
             }
             
             await db.execute(alterSql);
-            console.log(`[Schema] 表 '${tableName}' 已添加列 '${col.name}'`);
+            info(`[Schema] 表 '${tableName}' 已添加列 '${col.name}'`);
         }
     }
     // 如果 columnsToAdd.length === 0 且 shouldRebuild === false，则结构一致，无需操作

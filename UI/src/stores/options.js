@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { select, insert, update } from '../utils/sqlite';
 import { formatObjectString, getCurrentDateTime } from '../utils/function'
+import { info, error as errorLog, warn } from '@tauri-apps/plugin-log';
 
 export const useOptionsStore = defineStore('options', {
     actions: {
@@ -16,7 +17,7 @@ export const useOptionsStore = defineStore('options', {
             })
         },
         /**
-         * 获取设置项从设置名称
+         * 获取设置项对象从设置名称
          * @param {String} key 设置名称
          * @returns {Object<{index: number, data: Object}>}} index 数据下标 data 数据项
          */
@@ -34,6 +35,15 @@ export const useOptionsStore = defineStore('options', {
             }
 
             return result;
+        },
+        /**
+         * 获取设置项的值从设置名称
+         * @param {String} key 设置名称 
+         * @returns {null | String} 设置项的值
+         */
+        getOptionValueByKey(key){
+            const result = this.getOptionByKey(key);
+            return result.data ? result.data.value : null;
         },
         /**
          * 保存设置，如果库中已存在，则会替换，否则会添加
@@ -78,7 +88,7 @@ export const useOptionsStore = defineStore('options', {
                         }
                     } catch (error) {
                         const errorInfo = formatObjectString(`配置修改失败，Key: ${key}, val: ${element}, 错误信息：`, error);
-                        console.log(errorInfo);
+                        errorLog(errorInfo);
                         errorArray.push(errorInfo);
                     }
                     
