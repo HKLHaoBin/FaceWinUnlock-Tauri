@@ -26,20 +26,58 @@ echo "Server DLL 构建完成"
 echo "正在下载 ONNX 模型文件..."
 cd "$RESOURCES_DIR"
 
-# 人脸检测模型
+# 人脸检测模型 - 使用 GitHub 上的镜像
 if [ ! -f "face_detection_yunet_2023mar.onnx" ]; then
-    curl -L -o face_detection_yunet_2023mar.onnx \
-        "https://modelscope.cn/api/v1/models/iic/cv_manual_face-liveness_flrgb/repo?path=face_detection_yunet_2023mar.onnx"
-    echo "人脸检测模型下载完成"
+    echo "下载人脸检测模型..."
+    MAX_RETRIES=3
+    RETRY_COUNT=0
+    SUCCESS=false
+
+    while [ "$SUCCESS" = false ] && [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        echo "尝试下载 (第 $RETRY_COUNT 次)..."
+        if curl -L -f -o face_detection_yunet_2023mar.onnx \
+            "https://github.com/opencv/opencv_zoo/raw/master/models/face_detection_yunet/face_detection_yunet_2023mar.onnx" \
+            --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 300; then
+            SUCCESS=true
+            echo "人脸检测模型下载完成"
+        else
+            echo "下载失败，等待 5 秒后重试..."
+            sleep 5
+        fi
+    done
+
+    if [ "$SUCCESS" = false ]; then
+        echo "警告: 人脸检测模型下载失败，跳过此步骤" >&2
+    fi
 else
     echo "人脸检测模型已存在，跳过下载"
 fi
 
 # 人脸识别模型
 if [ ! -f "face_recognition_sface_2021dec.onnx" ]; then
-    curl -L -o face_recognition_sface_2021dec.onnx \
-        "https://github.com/opencv/opencv_zoo/raw/master/models/face_recognition_sface/face_recognition_sface_2021dec.onnx"
-    echo "人脸识别模型下载完成"
+    echo "下载人脸识别模型..."
+    MAX_RETRIES=3
+    RETRY_COUNT=0
+    SUCCESS=false
+
+    while [ "$SUCCESS" = false ] && [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        echo "尝试下载 (第 $RETRY_COUNT 次)..."
+        if curl -L -f -o face_recognition_sface_2021dec.onnx \
+            "https://github.com/opencv/opencv_zoo/raw/master/models/face_recognition_sface/face_recognition_sface_2021dec.onnx" \
+            --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 300; then
+            SUCCESS=true
+            echo "人脸识别模型下载完成"
+        else
+            echo "下载失败，等待 5 秒后重试..."
+            sleep 5
+        fi
+    done
+
+    if [ "$SUCCESS" = false ]; then
+        echo "警告: 人脸识别模型下载失败，跳过此步骤" >&2
+    fi
 else
     echo "人脸识别模型已存在，跳过下载"
 fi

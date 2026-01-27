@@ -151,6 +151,60 @@
 
 * [WinLogon DLL](Server/) - 负责与系统登录界面交互的核心组件。
 * [图形化界面](UI/) - 负责面容录入、配置管理的主程序。
+* [构建脚本](scripts/) - 自动化构建和资源下载脚本。
+
+## 🔧 开发与构建
+
+### 前置要求
+
+- **Rust**: 1.90.0 或更高版本
+- **Node.js**: LTS 版本
+- **Windows**: 10/11 64位系统
+- **OpenCV**: 通过 vcpkg 自动安装
+
+### 模型文件
+
+应用需要以下 AI 模型文件：
+
+- **face_detection_yunet_2023mar.onnx** - 人脸检测模型
+- **face_recognition_sface_2021dec.onnx** - 人脸识别模型
+
+模型文件会在首次构建时自动下载。如果自动下载失败，请参考 [模型文件下载指南](docs/MODELS.md) 手动下载。
+
+### 本地开发
+
+```bash
+# 1. 克隆仓库
+git clone https://github.com/HKLHaoBin/FaceWinUnlock-Tauri.git
+cd FaceWinUnlock-Tauri
+
+# 2. 下载模型文件（可选，构建时会自动下载）
+.\scripts\download-models.ps1  # Windows
+# 或
+./scripts/download-models.sh  # Linux/Mac
+
+# 3. 安装前端依赖
+cd UI
+npm install
+
+# 4. 启动开发服务器
+npm run tauri dev
+```
+
+### 构建 Release 版本
+
+```bash
+cd UI
+npm run tauri build
+```
+
+构建产物位于 `UI/src-tauri/target/release/bundle/` 目录。
+
+### 使用 GitHub Actions
+
+项目包含完整的 CI/CD 工作流，推送到 `main` 分支后会自动构建并创建 Release。
+
+**注意**: 首次构建可能需要 15-20 分钟（需下载和编译 OpenCV），后续构建使用缓存会更快。
 
 ---
 

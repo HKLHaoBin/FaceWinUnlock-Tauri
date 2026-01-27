@@ -25,29 +25,15 @@ Pop-Location
 
 # 2. 下载 ONNX 模型文件
 Write-Host "正在下载 ONNX 模型文件..." -ForegroundColor Yellow
-Push-Location $ResourcesDir
-
-# 人脸检测模型
-$FaceDetectionModel = "face_detection_yunet_2023mar.onnx"
-if (-not (Test-Path $FaceDetectionModel)) {
-    $Url = "https://modelscope.cn/api/v1/models/iic/cv_manual_face-liveness_flrgb/repo?path=face_detection_yunet_2023mar.onnx"
-    Invoke-WebRequest -Uri $Url -OutFile $FaceDetectionModel -UseBasicParsing
-    Write-Host "人脸检测模型下载完成" -ForegroundColor Green
+$DownloadScript = Join-Path $ScriptDir "download-models.ps1"
+if (Test-Path $DownloadScript) {
+    & $DownloadScript
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "警告: 模型下载失败，但将继续构建" -ForegroundColor Yellow
+    }
 } else {
-    Write-Host "人脸检测模型已存在，跳过下载" -ForegroundColor Cyan
+    Write-Host "警告: 模型下载脚本不存在，跳过此步骤" -ForegroundColor Yellow
 }
-
-# 人脸识别模型
-$FaceRecognitionModel = "face_recognition_sface_2021dec.onnx"
-if (-not (Test-Path $FaceRecognitionModel)) {
-    $Url = "https://github.com/opencv/opencv_zoo/raw/master/models/face_recognition_sface/face_recognition_sface_2021dec.onnx"
-    Invoke-WebRequest -Uri $Url -OutFile $FaceRecognitionModel -UseBasicParsing
-    Write-Host "人脸识别模型下载完成" -ForegroundColor Green
-} else {
-    Write-Host "人脸识别模型已存在，跳过下载" -ForegroundColor Cyan
-}
-
-Pop-Location
 
 # 3. OpenCV DLL 会在构建时从 vcpkg 自动复制
 Write-Host "OpenCV DLL 将在构建时从 vcpkg 自动复制" -ForegroundColor Cyan

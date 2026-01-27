@@ -74,6 +74,39 @@ jobs:
       - name: Prepare build resources
         run: powershell -ExecutionPolicy Bypass -File scripts\build-resources.ps1
 
+      - name: Download AI models
+        continue-on-error: true
+        run: powershell -ExecutionPolicy Bypass -File scripts\download-models.ps1
+
+      - name: Check model files
+        run: |
+          $resourcesDir = "UI\src-tauri\resources"
+          $requiredFiles = @(
+            "FaceWinUnlock-Tauri.dll",
+            "face_detection_yunet_2023mar.onnx",
+            "face_recognition_sface_2021dec.onnx"
+          )
+          Write-Host "检查必需的文件..." -ForegroundColor Cyan
+          $missingFiles = @()
+          foreach ($file in $requiredFiles) {
+            $filePath = "$resourcesDir\$file"
+            if (Test-Path $filePath) {
+              $fileSize = [math]::Round((Get-Item $filePath).Length / 1MB, 2)
+              Write-Host "  ✓ $file ($fileSize MB)" -ForegroundColor Green
+            } else {
+              $missingFiles += $file
+              Write-Host "  ✗ $file (缺失)" -ForegroundColor Red
+            }
+          }
+          Write-Host ""
+          if ($missingFiles.Count -gt 0) {
+            Write-Host "警告: 以下文件缺失: $($missingFiles -join ', ')" -ForegroundColor Yellow
+            Write-Host "部分功能可能无法正常工作" -ForegroundColor Yellow
+            Write-Host "用户需要在首次运行时手动下载缺失的模型文件" -ForegroundColor Yellow
+          } else {
+            Write-Host "所有必需的文件已就绪" -ForegroundColor Green
+          }
+
       - name: Copy OpenCV DLL
         run: |
           Copy-Item "C:\vcpkg\installed\x64-windows-static\bin\opencv_world*.dll" -Destination "UI\src-tauri\resources\"
