@@ -2,7 +2,7 @@ name: Build Tauri App for Windows
 on:
   push:
     branches:
-      - main  # 可根据实际仓库主分支名称修改为 master 或 main
+      - main
 permissions:
   contents: write
   actions: write
@@ -10,12 +10,20 @@ permissions:
   deployments: write
   packages: write
   id-token: write
+
+env:
+  VCPKG_ROOT: C:\vcpkg
+  VCPKG_DEFAULT_BINARY_CACHE: C:\vcpkg\archives
+  OPENCV_DISABLE_PROBES: pkg_config,cmake
+
 jobs:
   build-windows:
     runs-on: windows-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -24,25 +32,77 @@ jobs:
           cache: 'npm'
           cache-dependency-path: './UI/package-lock.json'
 
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        id: vcpkg-cache
+        with:
+          path: |
+            C:\vcpkg\installed
+            C:\vcpkg\buildtrees
+            C:\vcpkg\downloads
+          key: vcpkg-${{ hashFiles('**/Cargo.toml') }}-windows-latest
+          restore-keys: |
+            vcpkg-ubuntu-latest-
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            ./UI/src-tauri -> target
+            ./Server -> target
+
+      - name: Install vcpkg
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
+          C:\vcpkg\bootstrap-vcpkg.bat
+
+      - name: Install OpenCV via vcpkg
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        run: |
+          C:\vcpkg\vcpkg install opencv:x64-windows-static
+          C:\vcpkg\vcpkg integrate install
+
       - name: Install frontend dependencies
         run: cd UI && npm install
 
-      - name: Rust setup
-        uses: dtolnay/rust-toolchain@stable
+      - name: Prepare build resources
+        run: powershell -ExecutionPolicy Bypass -File scripts\build-resources.ps1
 
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './UI/src-tauri -> target'
+      - name: Copy OpenCV DLL
+        run: |
+          Copy-Item "C:\vcpkg\installed\x64-windows-static\bin\opencv_world*.dll" -Destination "UI\src-tauri\resources\"
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VCPKG_ROOT: C:\vcpkg
+          VCPKG_INSTALLED_DIR: C:\vcpkg\installed
+          RUSTFLAGS: -C link-args=/DEFAULTLIB:libcmt.lib
         with:
           projectPath: './UI'
-          tagName: ${{ github.ref_name }}
-          releaseName: 'App v__VERSION__'
-          releaseBody: 'Automatically built and released on push to main branch.'
+          tagName: v__VERSION__
+          releaseName: 'FaceWinUnlock v__VERSION__'
+          releaseBody: |
+            ## FaceWinUnlock v__VERSION__
+
+            自动构建版本，发布于：__DATE__
+
+            ### 主要功能
+            - 面容识别解锁
+            - 多账户支持
+            - 活体检测
+            - 系统级集成
+
+            ### 下载说明
+            请选择适合您系统的安装包进行下载。
+
+            **注意**：本软件需要管理员权限运行，请确保以管理员身份安装。
           releaseDraft: false
           prerelease: false
