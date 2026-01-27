@@ -1,0 +1,51 @@
+name: Build Tauri App for Windows
+on:
+  push:
+    branches:
+      - main  # 可根据实际仓库主分支名称修改为 master 或 main
+permissions:
+  contents: write
+  actions: write
+  attestations: write
+  deployments: write
+  packages: write
+  id-token: write
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'pnpm'
+          cache-dependency-path: './UI/pnpm-lock.yaml'
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install frontend dependencies
+        run: cd UI && pnpm install
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './UI/src-tauri -> target'
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: './UI'
+          tagName: ${{ github.ref_name }}
+          releaseName: 'App v__VERSION__'
+          releaseBody: 'Automatically built and released on push to main branch.'
+          releaseDraft: false
+          prerelease: false
