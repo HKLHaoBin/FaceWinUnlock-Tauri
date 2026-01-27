@@ -1,38 +1,38 @@
-# 模型下载脚本 - 独立的模型文件下载工具
+# Model download script - Standalone model file download tool
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "FaceWinUnlock 模型下载工具" -ForegroundColor Cyan
+Write-Host "FaceWinUnlock Model Download Tool" -ForegroundColor Cyan
 Write-Host "=========================" -ForegroundColor Cyan
 
-# 设置变量
+# Set variables
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
 $UIDir = Join-Path $ProjectRoot "UI"
 $ResourcesDir = Join-Path $UIDir "src-tauri\resources"
 
-# 创建资源目录
+# Create resource directory
 New-Item -ItemType Directory -Force -Path $ResourcesDir | Out-Null
 
-Write-Host "目标目录: $ResourcesDir" -ForegroundColor Gray
+Write-Host "Target directory: $ResourcesDir" -ForegroundColor Gray
 
-# 模型配置
+# Model configuration
 $Models = @(
     @{
-        Name = "人脸检测模型"
+        Name = "Face Detection Model (YuNet)"
         FileName = "face_detection_yunet_2023mar.onnx"
         Url = "https://github.com/opencv/opencv_zoo/releases/download/v20231218/face_detection_yunet_2023mar.onnx"
-        Size = ~3MB
+        Size = "~3MB"
     },
     @{
-        Name = "人脸识别模型"
+        Name = "Face Recognition Model (SFace)"
         FileName = "face_recognition_sface_2021dec.onnx"
         Url = "https://github.com/opencv/opencv_zoo/releases/download/v20231218/face_recognition_sface_2021dec.onnx"
-        Size = ~9MB
+        Size = "~9MB"
     }
 )
 
-# 下载函数
+# Download function
 function Download-Model {
     param (
         [string]$Name,
@@ -44,13 +44,13 @@ function Download-Model {
     $FilePath = Join-Path $ResourcesDir $FileName
 
     if (Test-Path $FilePath) {
-        Write-Host "✓ $Name 已存在" -ForegroundColor Green
+        Write-Host "OK $Name already exists" -ForegroundColor Green
         return $true
     }
 
-    Write-Host "↓ 正在下载 $Name..." -ForegroundColor Yellow
-    Write-Host "  文件: $FileName" -ForegroundColor Gray
-    Write-Host "  大小: $Size" -ForegroundColor Gray
+    Write-Host "Downloading $Name..." -ForegroundColor Yellow
+    Write-Host "  File: $FileName" -ForegroundColor Gray
+    Write-Host "  Size: $Size" -ForegroundColor Gray
     Write-Host "  URL: $Url" -ForegroundColor Gray
 
     $MaxRetries = 5
@@ -60,9 +60,9 @@ function Download-Model {
     while (-not $Success -and $RetryCount -lt $MaxRetries) {
         try {
             $RetryCount++
-            Write-Host "  尝试 $RetryCount/$MaxRetries..." -ForegroundColor Cyan
+            Write-Host "  Attempt $RetryCount/$MaxRetries..." -ForegroundColor Cyan
 
-            # 使用 curl 而不是 Invoke-WebRequest，因为它对大文件更可靠
+            # Use curl instead of Invoke-WebRequest for better reliability with large files
             $process = Start-Process -FilePath "curl" -ArgumentList @(
                 "-L",
                 "-o", "`"$FilePath`"",
@@ -78,19 +78,19 @@ function Download-Model {
             if ($process.ExitCode -eq 0) {
                 if (Test-Path $FilePath) {
                     $fileSize = (Get-Item $FilePath).Length
-                    Write-Host "  ✓ 下载成功 ($([math]::Round($fileSize / 1MB, 2)) MB)" -ForegroundColor Green
+                    Write-Host "  OK Download successful ($([math]::Round($fileSize / 1MB, 2)) MB)" -ForegroundColor Green
                     $Success = $true
                 } else {
-                    Write-Host "  ✗ 文件未创建" -ForegroundColor Red
+                    Write-Host "  ERROR File not created" -ForegroundColor Red
                 }
             } else {
-                Write-Host "  ✗ 下载失败 (退出码: $($process.ExitCode))" -ForegroundColor Red
+                Write-Host "  ERROR Download failed (exit code: $($process.ExitCode))" -ForegroundColor Red
                 if (Test-Path $FilePath) {
                     Remove-Item $FilePath -Force
                 }
             }
         } catch {
-            Write-Host "  ✗ 下载异常: $_" -ForegroundColor Red
+            Write-Host "  ERROR Download exception: $_" -ForegroundColor Red
             if (Test-Path $FilePath) {
                 Remove-Item $FilePath -Force
             }
@@ -98,7 +98,7 @@ function Download-Model {
 
         if (-not $Success -and $RetryCount -lt $MaxRetries) {
             $waitTime = [math]::Min(10 * $RetryCount, 30)
-            Write-Host "  等待 $waitTime 秒后重试..." -ForegroundColor Yellow
+            Write-Host "  Waiting $waitTime seconds before retry..." -ForegroundColor Yellow
             Start-Sleep -Seconds $waitTime
         }
     }
@@ -106,7 +106,7 @@ function Download-Model {
     return $Success
 }
 
-# 下载所有模型
+# Download all models
 $successCount = 0
 $failedModels = @()
 
@@ -124,35 +124,35 @@ foreach ($model in $Models) {
     }
 }
 
-# 显示结果
+# Display results
 Write-Host ""
 Write-Host "=========================" -ForegroundColor Cyan
-Write-Host "下载完成!" -ForegroundColor Cyan
+Write-Host "Download complete!" -ForegroundColor Cyan
 
 if ($successCount -eq $Models.Count) {
-    Write-Host "✓ 所有模型下载成功" -ForegroundColor Green
+    Write-Host "OK All models downloaded successfully" -ForegroundColor Green
 } else {
-    Write-Host "✗ 部分模型下载失败" -ForegroundColor Yellow
-    Write-Host "成功: $successCount/$($Models.Count)" -ForegroundColor Yellow
-    Write-Host "失败: $($failedModels.Count)" -ForegroundColor Yellow
+    Write-Host "WARNING Some models failed to download" -ForegroundColor Yellow
+    Write-Host "Success: $successCount/$($Models.Count)" -ForegroundColor Yellow
+    Write-Host "Failed: $($failedModels.Count)" -ForegroundColor Yellow
     if ($failedModels.Count -gt 0) {
-        Write-Host "失败的模型:" -ForegroundColor Yellow
+        Write-Host "Failed models:" -ForegroundColor Yellow
         foreach ($model in $failedModels) {
             Write-Host "  - $model" -ForegroundColor Red
         }
     }
     Write-Host ""
-    Write-Host "手动下载指南:" -ForegroundColor Yellow
-    Write-Host "1. 访问: https://github.com/opencv/opencv_zoo/releases" -ForegroundColor Gray
-    Write-Host "2. 下载以下文件:" -ForegroundColor Gray
+    Write-Host "Manual download guide:" -ForegroundColor Yellow
+    Write-Host "1. Visit: https://github.com/opencv/opencv_zoo/releases" -ForegroundColor Gray
+    Write-Host "2. Download the following files:" -ForegroundColor Gray
     foreach ($model in $Models) {
         Write-Host "   - $($model.FileName)" -ForegroundColor Gray
     }
-    Write-Host "3. 将文件复制到: $ResourcesDir" -ForegroundColor Gray
+    Write-Host "3. Copy files to: $ResourcesDir" -ForegroundColor Gray
 }
 
 Write-Host ""
-Write-Host "资源目录内容:" -ForegroundColor Cyan
+Write-Host "Resource directory contents:" -ForegroundColor Cyan
 Get-ChildItem $ResourcesDir | ForEach-Object {
     $size = [math]::Round($_.Length / 1MB, 2)
     Write-Host "  $($_.Name.PadRight(50)) $size MB" -ForegroundColor Gray
