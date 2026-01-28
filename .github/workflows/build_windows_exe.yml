@@ -111,12 +111,10 @@ jobs:
 
       - name: Copy OpenCV DLL
         run: |
-          if (Test-Path "C:\vcpkg\installed\x64-windows-static\bin\opencv_world*.dll") {
-            Copy-Item "C:\vcpkg\installed\x64-windows-static\bin\opencv_world*.dll" -Destination "UI\src-tauri\resources\"
-            Write-Host "OpenCV DLL 复制成功"
-          } else {
-            Write-Host "警告: OpenCV DLL 未找到，跳过复制步骤" -ForegroundColor Yellow
-          }
+          # x64-windows-static 是静态链接版本，OpenCV 已静态链接到可执行文件中，不需要复制 DLL
+          # 如果需要使用动态链接版本，请将 VCPKGRS_TRIPLET 改为 x64-windows
+          Write-Host "使用静态链接版本 (x64-windows-static)，OpenCV 已编译到可执行文件中" -ForegroundColor Cyan
+          Write-Host "跳过 DLL 复制步骤" -ForegroundColor Yellow
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0

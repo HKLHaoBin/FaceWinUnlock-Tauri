@@ -68,25 +68,47 @@ def verify_opencv_installation():
 
     installed_dir = VCPKG_ROOT / "installed" / VCPKG_TRIPLET
 
-    # Check DLL files
-    bin_dir = installed_dir / "bin"
-    dll_files = list(bin_dir.glob("opencv_world*.dll"))
+    # 检查是否为静态链接版本
+    is_static = "static" in VCPKG_TRIPLET
 
-    if not dll_files:
-        print(f"[ERROR] OpenCV DLL not found in {bin_dir}")
-        print(f"[INFO] Listing bin directory contents:")
-        if bin_dir.exists():
-            for item in bin_dir.iterdir():
-                print(f"  - {item.name}")
-        else:
-            print(f"  [Directory does not exist]")
-        return False
+    if is_static:
+        # 静态链接版本：检查 .lib 文件
+        lib_dir = installed_dir / "lib"
+        lib_files = list(lib_dir.glob("opencv_world*.lib"))
 
-    for dll in dll_files:
-        size_mb = dll.stat().st_size / (1024 * 1024)
-        print(f"[SUCCESS] Found OpenCV DLL: {dll.name} ({size_mb:.2f} MB)")
+        if not lib_files:
+            print(f"[ERROR] OpenCV static library not found in {lib_dir}")
+            print(f"[INFO] Listing lib directory contents:")
+            if lib_dir.exists():
+                for item in lib_dir.iterdir():
+                    print(f"  - {item.name}")
+            else:
+                print(f"  [Directory does not exist]")
+            return False
 
-    # Check OpenCVConfig.cmake
+        for lib in lib_files:
+            size_mb = lib.stat().st_size / (1024 * 1024)
+            print(f"[SUCCESS] Found OpenCV static library: {lib.name} ({size_mb:.2f} MB)")
+    else:
+        # 动态链接版本：检查 DLL 文件
+        bin_dir = installed_dir / "bin"
+        dll_files = list(bin_dir.glob("opencv_world*.dll"))
+
+        if not dll_files:
+            print(f"[ERROR] OpenCV DLL not found in {bin_dir}")
+            print(f"[INFO] Listing bin directory contents:")
+            if bin_dir.exists():
+                for item in bin_dir.iterdir():
+                    print(f"  - {item.name}")
+            else:
+                print(f"  [Directory does not exist]")
+            return False
+
+        for dll in dll_files:
+            size_mb = dll.stat().st_size / (1024 * 1024)
+            print(f"[SUCCESS] Found OpenCV DLL: {dll.name} ({size_mb:.2f} MB)")
+
+    # 检查 OpenCVConfig.cmake
     share_dir = installed_dir / "share" / "opencv4"
     config_file = share_dir / "OpenCVConfig.cmake"
 
@@ -101,7 +123,7 @@ def verify_opencv_installation():
 
     print(f"[SUCCESS] Found OpenCVConfig.cmake: {config_file}")
 
-    # Set environment variable
+    # 设置环境变量
     env_file = os.environ.get("GITHUB_ENV")
     if env_file:
         with open(env_file, 'a', encoding='utf-8') as f:
