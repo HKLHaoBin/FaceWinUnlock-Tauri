@@ -177,7 +177,6 @@ jobs:
           VCPKG_INSTALLED_DIR: C:\vcpkg\installed
           VCPKGRS_TRIPLET: x64-windows
           OpenCV_DIR: C:\vcpkg\installed\x64-windows\share\opencv4
-          OPENCV_LINK_LIBS: dylib
         with:
           projectPath: './UI'
           tagName: v__VERSION__
