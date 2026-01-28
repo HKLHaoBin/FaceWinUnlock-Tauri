@@ -74,21 +74,35 @@ def verify_opencv_installation():
     if is_static:
         # 静态链接版本：检查 .lib 文件
         lib_dir = installed_dir / "lib"
+
+        # 首先尝试查找 opencv_world*.lib（合并版本）
         lib_files = list(lib_dir.glob("opencv_world*.lib"))
 
+        # 如果没有找到 opencv_world*.lib，则检查模块化库文件（opencv_*.lib）
         if not lib_files:
-            print(f"[ERROR] OpenCV static library not found in {lib_dir}")
-            print(f"[INFO] Listing lib directory contents:")
-            if lib_dir.exists():
-                for item in lib_dir.iterdir():
-                    print(f"  - {item.name}")
-            else:
-                print(f"  [Directory does not exist]")
-            return False
+            # 检查是否存在 OpenCV 模块化库文件
+            opencv_libs = list(lib_dir.glob("opencv_*.lib"))
+            # 排除一些非核心库（如 opencv_java4.lib 等）
+            opencv_libs = [lib for lib in opencv_libs if lib.name.startswith(("opencv_core", "opencv_imgproc", "opencv_highgui", "opencv_imgcodecs", "opencv_video", "opencv_videoio", "opencv_dnn", "opencv_features2d", "opencv_calib3d", "opencv_objdetect", "opencv_ml", "opencv_photo", "opencv_flann", "opencv_stitching"))]
 
-        for lib in lib_files:
-            size_mb = lib.stat().st_size / (1024 * 1024)
-            print(f"[SUCCESS] Found OpenCV static library: {lib.name} ({size_mb:.2f} MB)")
+            if not opencv_libs:
+                print(f"[ERROR] OpenCV static library not found in {lib_dir}")
+                print(f"[INFO] Listing lib directory contents:")
+                if lib_dir.exists():
+                    for item in lib_dir.iterdir():
+                        print(f"  - {item.name}")
+                else:
+                    print(f"  [Directory does not exist]")
+                return False
+
+            print(f"[SUCCESS] Found {len(opencv_libs)} OpenCV module libraries:")
+            for lib in sorted(opencv_libs):
+                size_mb = lib.stat().st_size / (1024 * 1024)
+                print(f"  - {lib.name} ({size_mb:.2f} MB)")
+        else:
+            for lib in lib_files:
+                size_mb = lib.stat().st_size / (1024 * 1024)
+                print(f"[SUCCESS] Found OpenCV static library: {lib.name} ({size_mb:.2f} MB)")
     else:
         # 动态链接版本：检查 DLL 文件
         bin_dir = installed_dir / "bin"
