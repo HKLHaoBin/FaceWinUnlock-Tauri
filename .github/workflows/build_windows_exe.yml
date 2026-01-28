@@ -63,6 +63,11 @@ jobs:
           }
           C:\vcpkg\bootstrap-vcpkg.bat
 
+      - name: Create vcpkg binary cache directory
+        run: |
+          New-Item -ItemType Directory -Force -Path "C:\vcpkg\archives" | Out-Null
+          Write-Host "Created vcpkg binary cache directory: C:\vcpkg\archives"
+
       - name: Install OpenCV via vcpkg
         run: python scripts/install_opencv.py
 
