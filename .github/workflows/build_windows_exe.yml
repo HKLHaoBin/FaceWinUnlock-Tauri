@@ -47,7 +47,7 @@ jobs:
             C:\vcpkg\downloads
           key: vcpkg-${{ hashFiles('**/Cargo.toml') }}-windows-latest
           restore-keys: |
-            vcpkg-ubuntu-latest-
+            vcpkg-windows-latest-
 
       - name: Cache Rust
         uses: swatinem/rust-cache@v2
@@ -57,9 +57,10 @@ jobs:
             ./Server -> target
 
       - name: Install vcpkg
-        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
         run: |
-          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
+          if (-not (Test-Path "C:\vcpkg")) {
+            git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
+          }
           C:\vcpkg\bootstrap-vcpkg.bat
 
       - name: Install OpenCV via vcpkg
