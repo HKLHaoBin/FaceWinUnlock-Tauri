@@ -123,13 +123,34 @@ jobs:
             New-Item -ItemType Directory -Force -Path $resourcesDir | Out-Null
           }
 
-          # 复制所有 OpenCV DLL
-          $opencvDlls = Get-ChildItem -Path $opencvBinDir -Filter "opencv_world*.dll"
-          foreach ($dll in $opencvDlls) {
-            Write-Host "  复制 $($dll.Name)..." -ForegroundColor Yellow
-            Copy-Item -Path $dll.FullName -Destination $resourcesDir -Force
-            # 同时复制到 target/release 目录，确保运行时能找到
-            Copy-Item -Path $dll.FullName -Destination $targetDir -Force
+          # 首先尝试查找 opencv_world*.dll（合并版本）
+          $opencvWorldDlls = Get-ChildItem -Path $opencvBinDir -Filter "opencv_world*.dll" -ErrorAction SilentlyContinue
+
+          if ($opencvWorldDlls.Count -gt 0) {
+            # 使用 opencv_world*.dll
+            foreach ($dll in $opencvWorldDlls) {
+              Write-Host "  复制 $($dll.Name)..." -ForegroundColor Yellow
+              Copy-Item -Path $dll.FullName -Destination $resourcesDir -Force
+              # 同时复制到 target/release 目录，确保运行时能找到
+              Copy-Item -Path $dll.FullName -Destination $targetDir -Force
+            }
+          } else {
+            # 使用模块化 DLL（opencv_*.dll）
+            $opencvModuleDlls = Get-ChildItem -Path $opencvBinDir -Filter "opencv_*.dll" | Where-Object {
+              $_.Name -match "^opencv_(core|imgproc|highgui|imgcodecs|video|videoio|dnn|features2d|calib3d|objdetect|ml|photo|flann|stitching)\d+\.dll$"
+            }
+
+            Write-Host "  找到 $($opencvModuleDlls.Count) 个 OpenCV 模块 DLL" -ForegroundColor Cyan
+            foreach ($dll in $opencvModuleDlls) {
+              Write-Host "  复制 $($dll.Name)..." -ForegroundColor Yellow
+              Copy-Item -Path $dll.FullName -Destination $resourcesDir -Force
+              # 同时复制到 target/release 目录，确保运行时能找到
+              Copy-Item -Path $dll.FullName -Destination $targetDir -Force
+            }
+
+            if ($opencvModuleDlls.Count -eq 0) {
+              Write-Host "  警告: 未找到任何 OpenCV DLL 文件" -ForegroundColor Yellow
+            }
           }
 
           # 复制依赖的 DLL（如果有的话）
@@ -153,6 +174,7 @@ jobs:
           VCPKG_INSTALLED_DIR: C:\vcpkg\installed
           VCPKGRS_TRIPLET: x64-windows
           OpenCV_DIR: C:\vcpkg\installed\x64-windows\share\opencv4
+          OPENCV_LINK_LIBS: dylib
         with:
           projectPath: './UI'
           tagName: v__VERSION__

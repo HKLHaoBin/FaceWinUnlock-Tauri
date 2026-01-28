@@ -106,21 +106,35 @@ def verify_opencv_installation():
     else:
         # 动态链接版本：检查 DLL 文件
         bin_dir = installed_dir / "bin"
+
+        # 首先尝试查找 opencv_world*.dll（合并版本）
         dll_files = list(bin_dir.glob("opencv_world*.dll"))
 
+        # 如果没有找到 opencv_world*.dll，则检查模块化库文件（opencv_*.dll）
         if not dll_files:
-            print(f"[ERROR] OpenCV DLL not found in {bin_dir}")
-            print(f"[INFO] Listing bin directory contents:")
-            if bin_dir.exists():
-                for item in bin_dir.iterdir():
-                    print(f"  - {item.name}")
-            else:
-                print(f"  [Directory does not exist]")
-            return False
+            # 检查是否存在 OpenCV 模块化库文件
+            opencv_dlls = list(bin_dir.glob("opencv_*.dll"))
+            # 排除一些非核心库（如 opencv_java4.dll 等）
+            opencv_dlls = [dll for dll in opencv_dlls if dll.name.startswith(("opencv_core", "opencv_imgproc", "opencv_highgui", "opencv_imgcodecs", "opencv_video", "opencv_videoio", "opencv_dnn", "opencv_features2d", "opencv_calib3d", "opencv_objdetect", "opencv_ml", "opencv_photo", "opencv_flann", "opencv_stitching"))]
 
-        for dll in dll_files:
-            size_mb = dll.stat().st_size / (1024 * 1024)
-            print(f"[SUCCESS] Found OpenCV DLL: {dll.name} ({size_mb:.2f} MB)")
+            if not opencv_dlls:
+                print(f"[ERROR] OpenCV DLL not found in {bin_dir}")
+                print(f"[INFO] Listing bin directory contents:")
+                if bin_dir.exists():
+                    for item in bin_dir.iterdir():
+                        print(f"  - {item.name}")
+                else:
+                    print(f"  [Directory does not exist]")
+                return False
+
+            print(f"[SUCCESS] Found {len(opencv_dlls)} OpenCV module DLLs:")
+            for dll in sorted(opencv_dlls):
+                size_mb = dll.stat().st_size / (1024 * 1024)
+                print(f"  - {dll.name} ({size_mb:.2f} MB)")
+        else:
+            for dll in dll_files:
+                size_mb = dll.stat().st_size / (1024 * 1024)
+                print(f"[SUCCESS] Found OpenCV DLL: {dll.name} ({size_mb:.2f} MB)")
 
     # 检查 OpenCVConfig.cmake
     share_dir = installed_dir / "share" / "opencv4"
