@@ -19,9 +19,13 @@ use windows::core::{Interface, HRESULT};
 use windows::Win32::System::Com::{IClassFactory, IClassFactory_Impl};
 
 // 导入凭据提供程序和凭据的实现模块
+#[allow(non_snake_case)]
 pub mod CSampleProvider;
+#[allow(non_snake_case)]
 pub mod CSampleCredential;
+#[allow(non_snake_case)]
 pub mod CPipeListener;
+#[allow(non_snake_case)]
 pub mod Pipe;
 
 use CSampleProvider::SampleProvider;
@@ -121,6 +125,7 @@ pub fn read_facewinunlock_registry(key_name: &str) -> windows::core::Result<Stri
 
 // 定义凭据提供程序的GUID，用于系统识别
 // 8a7b9c6d-4e5f-89a0-8b7c-6d5e4f3e2d1c
+#[allow(non_upper_case_globals)]
 pub const CLSID_SampleProvider: GUID = GUID::from_u128(0x8a7b9c6d_4e5f_89a0_8b7c_6d5e4f3e2d1c);
 
 // 共享的凭据信息
