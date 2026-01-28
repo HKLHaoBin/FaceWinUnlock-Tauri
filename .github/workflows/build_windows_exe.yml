@@ -14,7 +14,7 @@ permissions:
 env:
   VCPKG_ROOT: C:\vcpkg
   VCPKG_DEFAULT_BINARY_CACHE: C:\vcpkg\archives
-  VCPKGRS_TRIPLET: x64-windows-static
+  VCPKGRS_TRIPLET: x64-windows
 
 jobs:
   build-windows:
@@ -42,11 +42,11 @@ jobs:
         id: vcpkg-cache
         with:
           path: |
-            C:\vcpkg\installed\x64-windows-static
+            C:\vcpkg\installed\x64-windows
             C:\vcpkg\archives
-          key: vcpkg-opencv-x64-windows-static-${{ hashFiles('**/Cargo.toml') }}
+          key: vcpkg-opencv-x64-windows-${{ hashFiles('**/Cargo.toml') }}
           restore-keys: |
-            vcpkg-opencv-x64-windows-static-
+            vcpkg-opencv-x64-windows-
 
       - name: Cache Rust
         uses: swatinem/rust-cache@v2
@@ -111,10 +111,39 @@ jobs:
 
       - name: Copy OpenCV DLL
         run: |
-          # x64-windows-static 是静态链接版本，OpenCV 已静态链接到可执行文件中，不需要复制 DLL
-          # 如果需要使用动态链接版本，请将 VCPKGRS_TRIPLET 改为 x64-windows
-          Write-Host "使用静态链接版本 (x64-windows-static)，OpenCV 已编译到可执行文件中" -ForegroundColor Cyan
-          Write-Host "跳过 DLL 复制步骤" -ForegroundColor Yellow
+          # x64-windows 是动态链接版本，需要复制 OpenCV DLL 到资源目录
+          $opencvBinDir = "C:\vcpkg\installed\x64-windows\bin"
+          $resourcesDir = "UI\src-tauri\resources"
+          $targetDir = "UI\src-tauri\target\release"
+
+          Write-Host "复制 OpenCV DLL..." -ForegroundColor Cyan
+
+          # 确保目标目录存在
+          if (-not (Test-Path $resourcesDir)) {
+            New-Item -ItemType Directory -Force -Path $resourcesDir | Out-Null
+          }
+
+          # 复制所有 OpenCV DLL
+          $opencvDlls = Get-ChildItem -Path $opencvBinDir -Filter "opencv_world*.dll"
+          foreach ($dll in $opencvDlls) {
+            Write-Host "  复制 $($dll.Name)..." -ForegroundColor Yellow
+            Copy-Item -Path $dll.FullName -Destination $resourcesDir -Force
+            # 同时复制到 target/release 目录，确保运行时能找到
+            Copy-Item -Path $dll.FullName -Destination $targetDir -Force
+          }
+
+          # 复制依赖的 DLL（如果有的话）
+          $depDlls = @("libcrypto*.dll", "libssl*.dll", "zlib*.dll")
+          foreach ($pattern in $depDlls) {
+            $depFiles = Get-ChildItem -Path $opencvBinDir -Filter $pattern -ErrorAction SilentlyContinue
+            foreach ($file in $depFiles) {
+              Write-Host "  复制依赖 DLL $($file.Name)..." -ForegroundColor Yellow
+              Copy-Item -Path $file.FullName -Destination $resourcesDir -Force
+              Copy-Item -Path $file.FullName -Destination $targetDir -Force
+            }
+          }
+
+          Write-Host "OpenCV DLL 复制完成" -ForegroundColor Green
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -122,9 +151,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VCPKG_ROOT: C:\vcpkg
           VCPKG_INSTALLED_DIR: C:\vcpkg\installed
-          VCPKGRS_TRIPLET: x64-windows-static
-          OpenCV_DIR: C:\vcpkg\installed\x64-windows-static\share\opencv4
-          RUSTFLAGS: -C link-args=/DEFAULTLIB:libcmt.lib
+          VCPKGRS_TRIPLET: x64-windows
+          OpenCV_DIR: C:\vcpkg\installed\x64-windows\share\opencv4
         with:
           projectPath: './UI'
           tagName: v__VERSION__

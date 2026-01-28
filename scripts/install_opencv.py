@@ -19,7 +19,7 @@ if sys.platform == 'win32':
 
 # 配置
 VCPKG_ROOT = Path(r"C:\vcpkg")
-VCPKG_TRIPLET = "x64-windows-static"
+VCPKG_TRIPLET = "x64-windows"
 MAX_RETRIES = 3
 RETRY_DELAY = 30
 
