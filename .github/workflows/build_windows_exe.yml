@@ -122,6 +122,9 @@ jobs:
           if (-not (Test-Path $resourcesDir)) {
             New-Item -ItemType Directory -Force -Path $resourcesDir | Out-Null
           }
+          if (-not (Test-Path $targetDir)) {
+            New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+          }
 
           # 首先尝试查找 opencv_world*.dll（合并版本）
           $opencvWorldDlls = Get-ChildItem -Path $opencvBinDir -Filter "opencv_world*.dll" -ErrorAction SilentlyContinue
