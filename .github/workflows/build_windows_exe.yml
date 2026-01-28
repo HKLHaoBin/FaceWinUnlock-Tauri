@@ -46,9 +46,9 @@ jobs:
             C:\vcpkg\installed
             C:\vcpkg\buildtrees
             C:\vcpkg\downloads
-          key: vcpkg-${{ hashFiles('**/Cargo.toml') }}-windows-latest
+          key: vcpkg-opencv-x64-windows-static-${{ hashFiles('**/Cargo.toml') }}
           restore-keys: |
-            vcpkg-windows-latest-
+            vcpkg-opencv-x64-windows-static-
 
       - name: Cache Rust
         uses: swatinem/rust-cache@v2
@@ -66,10 +66,29 @@ jobs:
 
       - name: Install OpenCV via vcpkg
         run: |
-          if (-not (Test-Path "C:\vcpkg\installed\x64-windows-static\bin\opencv_world*.dll")) {
-            C:\vcpkg\vcpkg install opencv:x64-windows-static
-          }
+          Write-Host "开始安装 OpenCV..." -ForegroundColor Cyan
+          C:\vcpkg\vcpkg install opencv:x64-windows-static
           C:\vcpkg\vcpkg integrate install
+          Write-Host "OpenCV 安装完成" -ForegroundColor Green
+
+      - name: Verify OpenCV installation
+        run: |
+          Write-Host "验证 OpenCV 安装..." -ForegroundColor Cyan
+          $opencvDll = Get-Item "C:\vcpkg\installed\x64-windows-static\bin\opencv_world*.dll" -ErrorAction SilentlyContinue
+          if ($opencvDll) {
+            Write-Host "找到 OpenCV DLL: $($opencvDll.Name)" -ForegroundColor Green
+            $opencvDir = Split-Path (Split-Path $opencvDll.FullName -Parent) -Parent
+            Write-Host "OpenCV 安装目录: $opencvDir" -ForegroundColor Green
+            $opencvConfig = Join-Path $opencvDir "share\opencv4\OpenCVConfig.cmake"
+            if (Test-Path $opencvConfig) {
+              Write-Host "找到 OpenCVConfig.cmake" -ForegroundColor Green
+            } else {
+              Write-Host "警告: 未找到 OpenCVConfig.cmake" -ForegroundColor Yellow
+            }
+          } else {
+            Write-Host "错误: 未找到 OpenCV DLL" -ForegroundColor Red
+            exit 1
+          }
 
       - name: Install frontend dependencies
         run: cd UI && npm install
