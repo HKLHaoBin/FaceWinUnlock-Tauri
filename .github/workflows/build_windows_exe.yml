@@ -42,9 +42,8 @@ jobs:
         id: vcpkg-cache
         with:
           path: |
-            C:\vcpkg\installed
-            C:\vcpkg\buildtrees
-            C:\vcpkg\downloads
+            C:\vcpkg\installed\x64-windows-static
+            C:\vcpkg\archives
           key: vcpkg-opencv-x64-windows-static-${{ hashFiles('**/Cargo.toml') }}
           restore-keys: |
             vcpkg-opencv-x64-windows-static-
