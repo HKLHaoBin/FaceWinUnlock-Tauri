@@ -40,17 +40,17 @@ Write-Host "Copying all OpenCV DLLs to resources directory..." -ForegroundColor 
 $OpenCVBinDir = "C:\vcpkg\installed\x64-windows\bin"
 
 if (Test-Path $OpenCVBinDir) {
-    # 复制所有 opencv_*.dll
+    # Copy all opencv_*.dll files
     $opencvDlls = Get-ChildItem -Path $OpenCVBinDir -Filter "opencv_*.dll" -ErrorAction SilentlyContinue
     foreach ($dll in $opencvDlls) {
         Copy-Item -Path $dll.FullName -Destination $ResourcesDir -Force
-        Write-Host "  - $($dll.Name) (OpenCV 核心库)" -ForegroundColor Green
+        Write-Host "  - $($dll.Name) (OpenCV Core)" -ForegroundColor Green
     }
 
-    # 复制所有依赖 DLL（包括 libwebp, jpeg, zlib, libpng, libtiff, tbb 等）
+    # Copy all dependency DLLs (including libwebp, jpeg, zlib, libpng, libtiff, tbb, etc.)
     $allDlls = Get-ChildItem -Path $OpenCVBinDir -Filter "*.dll" -ErrorAction SilentlyContinue
 
-    # 排除 OpenCV DLL（已经复制过了）和 vcpkg 自己的 DLL
+    # Exclude OpenCV DLLs (already copied) and vcpkg DLLs
     $depDlls = $allDlls | Where-Object {
         $_.Name -notmatch "^opencv_" -and
         $_.Name -notmatch "^vcpkg" -and
@@ -61,10 +61,10 @@ if (Test-Path $OpenCVBinDir) {
 
     foreach ($dll in $depDlls) {
         Copy-Item -Path $dll.FullName -Destination $ResourcesDir -Force
-        Write-Host "  - $($dll.Name) (依赖库)" -ForegroundColor Green
+        Write-Host "  - $($dll.Name) (Dependency)" -ForegroundColor Green
     }
 
-    Write-Host "总共复制了 $($opencvDlls.Count + $depDlls.Count) 个 DLL 文件" -ForegroundColor Cyan
+    Write-Host "Total copied $($opencvDlls.Count + $depDlls.Count) DLL files" -ForegroundColor Cyan
 } else {
     Write-Host "WARNING: OpenCV bin directory not found at $OpenCVBinDir" -ForegroundColor Yellow
 }
