@@ -197,3 +197,54 @@ jobs:
             **注意**：本软件需要管理员权限运行，请确保以管理员身份安装。
           releaseDraft: false
           prerelease: false
+
+      - name: Copy OpenCV DLL to bundle output
+        run: |
+          # Tauri 构建完成后，将 OpenCV DLL 复制到打包输出目录
+          $resourcesDir = "UI\src-tauri\resources"
+          $bundleDir = "UI\src-tauri\target\release\bundle"
+
+          Write-Host "查找打包输出目录..." -ForegroundColor Cyan
+
+          # 查找所有打包输出目录
+          $bundleDirs = Get-ChildItem -Path $bundleDir -Directory -ErrorAction SilentlyContinue
+
+          if ($bundleDirs.Count -eq 0) {
+            Write-Host "  警告: 未找到打包输出目录" -ForegroundColor Yellow
+            exit 0
+          }
+
+          Write-Host "  找到 $($bundleDirs.Count) 个打包输出目录" -ForegroundColor Green
+
+          # 遍历每个打包目录
+          foreach ($bundle in $bundleDirs) {
+            Write-Host "`n处理打包目录: $($bundle.Name)" -ForegroundColor Cyan
+
+            # 查找可执行文件所在的目录
+            $exeFiles = Get-ChildItem -Path $bundle.FullName -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue
+
+            foreach ($exe in $exeFiles) {
+              $exeDir = $exe.DirectoryName
+              Write-Host "  将 OpenCV DLL 复制到: $exeDir" -ForegroundColor Yellow
+
+              # 复制所有 opencv_*.dll 到可执行文件目录
+              $opencvDlls = Get-ChildItem -Path $resourcesDir -Filter "opencv_*.dll" -ErrorAction SilentlyContinue
+
+              foreach ($dll in $opencvDlls) {
+                Copy-Item -Path $dll.FullName -Destination $exeDir -Force
+                Write-Host "    - $($dll.Name)" -ForegroundColor Green
+              }
+
+              # 复制依赖的 DLL
+              $depDlls = @("libcrypto*.dll", "libssl*.dll", "zlib*.dll")
+              foreach ($pattern in $depDlls) {
+                $depFiles = Get-ChildItem -Path $resourcesDir -Filter $pattern -ErrorAction SilentlyContinue
+                foreach ($file in $depFiles) {
+                  Copy-Item -Path $file.FullName -Destination $exeDir -Force
+                  Write-Host "    - $($file.Name) (依赖)" -ForegroundColor Green
+                }
+              }
+            }
+          }
+
+          Write-Host "`nOpenCV DLL 复制完成" -ForegroundColor Green
