@@ -109,79 +109,6 @@ jobs:
             Write-Host "所有必需的文件已就绪" -ForegroundColor Green
           }
 
-      - name: Copy OpenCV DLL
-        run: |
-          # x64-windows 是动态链接版本，需要复制 OpenCV DLL 到资源目录
-          $opencvBinDir = "C:\vcpkg\installed\x64-windows\bin"
-          $resourcesDir = "UI\src-tauri\resources"
-          $targetDir = "UI\src-tauri\target\release"
-
-          Write-Host "复制 OpenCV DLL..." -ForegroundColor Cyan
-
-          # 确保目标目录存在
-          if (-not (Test-Path $resourcesDir)) {
-            New-Item -ItemType Directory -Force -Path $resourcesDir | Out-Null
-          }
-
-          # 首先尝试查找 opencv_world*.dll（合并版本）
-          $opencvWorldDlls = Get-ChildItem -Path $opencvBinDir -Filter "opencv_world*.dll" -ErrorAction SilentlyContinue
-
-          if ($opencvWorldDlls.Count -gt 0) {
-            # 使用 opencv_world*.dll
-            foreach ($dll in $opencvWorldDlls) {
-              Write-Host "  复制 $($dll.Name)..." -ForegroundColor Yellow
-              Copy-Item -Path $dll.FullName -Destination $resourcesDir -Force
-            }
-          } else {
-            # 使用模块化 DLL（opencv_*.dll）
-            $opencvModuleDlls = Get-ChildItem -Path $opencvBinDir -Filter "opencv_*.dll" | Where-Object {
-              $_.Name -match "^opencv_(core|imgproc|highgui|imgcodecs|video|videoio|dnn|features2d|calib3d|objdetect|ml|photo|flann|stitching)\d+\.dll$"
-            }
-
-            Write-Host "  找到 $($opencvModuleDlls.Count) 个 OpenCV 模块 DLL" -ForegroundColor Cyan
-            foreach ($dll in $opencvModuleDlls) {
-              Write-Host "  复制 $($dll.Name)..." -ForegroundColor Yellow
-              Copy-Item -Path $dll.FullName -Destination $resourcesDir -Force
-            }
-
-            if ($opencvModuleDlls.Count -eq 0) {
-              Write-Host "  警告: 未找到任何 OpenCV DLL 文件" -ForegroundColor Yellow
-            }
-          }
-
-          # 复制依赖的 DLL（如果有的话）
-          $depDlls = @(
-            "libcrypto*.dll",
-            "libssl*.dll",
-            "zlib*.dll",
-            "libwebp*.dll",
-            "jpeg*.dll",
-            "libpng*.dll",
-            "tiff*.dll",
-            "libopenjp2*.dll",
-            "libprotobuf*.dll",
-            "liblzma*.dll",
-            "zstd*.dll",
-            "libiconv*.dll",
-            "libintl*.dll"
-          )
-          foreach ($pattern in $depDlls) {
-            $depFiles = Get-ChildItem -Path $opencvBinDir -Filter $pattern -ErrorAction SilentlyContinue
-            foreach ($file in $depFiles) {
-              Write-Host "  复制依赖 DLL $($file.Name)..." -ForegroundColor Yellow
-              Copy-Item -Path $file.FullName -Destination $resourcesDir -Force
-            }
-          }
-
-          # 列出复制的文件
-          Write-Host "`n已复制的 OpenCV 相关文件:" -ForegroundColor Cyan
-          Get-ChildItem -Path $resourcesDir -Filter "*.dll" | ForEach-Object {
-            $fileSize = [math]::Round($_.Length / 1KB, 2)
-            Write-Host "  - $($_.Name) ($fileSize KB)" -ForegroundColor Green
-          }
-
-          Write-Host "`nOpenCV DLL 复制完成" -ForegroundColor Green
-
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -214,8 +141,8 @@ jobs:
 
       - name: Copy OpenCV DLL to bundle output
         run: |
-          # Tauri 构建完成后，将 OpenCV DLL 复制到打包输出目录
-          $resourcesDir = "UI\src-tauri\resources"
+          # Tauri 构建完成后，直接从 vcpkg bin 目录复制所有需要的 DLL 到可执行文件目录
+          $opencvBinDir = "C:\vcpkg\installed\x64-windows\bin"
           $bundleDir = "UI\src-tauri\target\release\bundle"
 
           Write-Host "查找打包输出目录..." -ForegroundColor Cyan
@@ -239,39 +166,32 @@ jobs:
 
             foreach ($exe in $exeFiles) {
               $exeDir = $exe.DirectoryName
-              Write-Host "  将 OpenCV DLL 复制到: $exeDir" -ForegroundColor Yellow
+              Write-Host "  将 DLL 复制到: $exeDir" -ForegroundColor Yellow
 
-              # 复制所有 opencv_*.dll 到可执行文件目录
-              $opencvDlls = Get-ChildItem -Path $resourcesDir -Filter "opencv_*.dll" -ErrorAction SilentlyContinue
-
+              # 复制所有 opencv_*.dll
+              $opencvDlls = Get-ChildItem -Path $opencvBinDir -Filter "opencv_*.dll" -ErrorAction SilentlyContinue
               foreach ($dll in $opencvDlls) {
                 Copy-Item -Path $dll.FullName -Destination $exeDir -Force
-                Write-Host "    - $($dll.Name)" -ForegroundColor Green
+                Write-Host "    - $($dll.Name) (OpenCV)" -ForegroundColor Green
               }
 
-              # 复制依赖的 DLL
-              $depDlls = @(
-                "libcrypto*.dll",
-                "libssl*.dll",
-                "zlib*.dll",
-                "libwebp*.dll",
-                "jpeg*.dll",
-                "libpng*.dll",
-                "tiff*.dll",
-                "libopenjp2*.dll",
-                "libprotobuf*.dll",
-                "liblzma*.dll",
-                "zstd*.dll",
-                "libiconv*.dll",
-                "libintl*.dll"
-              )
-              foreach ($pattern in $depDlls) {
-                $depFiles = Get-ChildItem -Path $resourcesDir -Filter $pattern -ErrorAction SilentlyContinue
-                foreach ($file in $depFiles) {
-                  Copy-Item -Path $file.FullName -Destination $exeDir -Force
-                  Write-Host "    - $($file.Name) (依赖)" -ForegroundColor Green
-                }
+              # 复制所有依赖 DLL（包括 OpenSSL、zlib、图像编解码库等）
+              $allDlls = Get-ChildItem -Path $opencvBinDir -Filter "*.dll" -ErrorAction SilentlyContinue
+
+              # 排除 OpenCV DLL（已经复制过了）和 vcpkg 自己的 DLL
+              $depDlls = $allDlls | Where-Object {
+                $_.Name -notmatch "^opencv_" -and
+                $_.Name -notmatch "^vcpkg" -and
+                $_.Name -notmatch "^msvcp" -and
+                $_.Name -notmatch "^vcruntime"
               }
+
+              foreach ($dll in $depDlls) {
+                Copy-Item -Path $dll.FullName -Destination $exeDir -Force
+                Write-Host "    - $($dll.Name) (依赖)" -ForegroundColor Green
+              }
+
+              Write-Host "`n  共复制了 $($opencvDlls.Count + $depDlls.Count) 个 DLL 文件" -ForegroundColor Cyan
             }
           }
 
