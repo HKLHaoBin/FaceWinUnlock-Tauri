@@ -122,9 +122,6 @@ jobs:
           if (-not (Test-Path $resourcesDir)) {
             New-Item -ItemType Directory -Force -Path $resourcesDir | Out-Null
           }
-          if (-not (Test-Path $targetDir)) {
-            New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
-          }
 
           # 首先尝试查找 opencv_world*.dll（合并版本）
           $opencvWorldDlls = Get-ChildItem -Path $opencvBinDir -Filter "opencv_world*.dll" -ErrorAction SilentlyContinue
@@ -134,8 +131,6 @@ jobs:
             foreach ($dll in $opencvWorldDlls) {
               Write-Host "  复制 $($dll.Name)..." -ForegroundColor Yellow
               Copy-Item -Path $dll.FullName -Destination $resourcesDir -Force
-              # 同时复制到 target/release 目录，确保运行时能找到
-              Copy-Item -Path $dll.FullName -Destination $targetDir -Force
             }
           } else {
             # 使用模块化 DLL（opencv_*.dll）
@@ -147,8 +142,6 @@ jobs:
             foreach ($dll in $opencvModuleDlls) {
               Write-Host "  复制 $($dll.Name)..." -ForegroundColor Yellow
               Copy-Item -Path $dll.FullName -Destination $resourcesDir -Force
-              # 同时复制到 target/release 目录，确保运行时能找到
-              Copy-Item -Path $dll.FullName -Destination $targetDir -Force
             }
 
             if ($opencvModuleDlls.Count -eq 0) {
@@ -163,11 +156,17 @@ jobs:
             foreach ($file in $depFiles) {
               Write-Host "  复制依赖 DLL $($file.Name)..." -ForegroundColor Yellow
               Copy-Item -Path $file.FullName -Destination $resourcesDir -Force
-              Copy-Item -Path $file.FullName -Destination $targetDir -Force
             }
           }
 
-          Write-Host "OpenCV DLL 复制完成" -ForegroundColor Green
+          # 列出复制的文件
+          Write-Host "`n已复制的 OpenCV 相关文件:" -ForegroundColor Cyan
+          Get-ChildItem -Path $resourcesDir -Filter "*.dll" | ForEach-Object {
+            $fileSize = [math]::Round($_.Length / 1KB, 2)
+            Write-Host "  - $($_.Name) ($fileSize KB)" -ForegroundColor Green
+          }
+
+          Write-Host "`nOpenCV DLL 复制完成" -ForegroundColor Green
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
