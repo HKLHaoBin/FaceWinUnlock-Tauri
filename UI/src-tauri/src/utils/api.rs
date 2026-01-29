@@ -112,9 +112,17 @@ pub fn init_model() -> Result<CustomResult, CustomResult> {
             .join("resources")
             .join("face_detection_yunet_2023mar.onnx");
 
+        // 标准化路径，使用正斜杠避免转义问题
+        let resource_path_str = resource_path
+            .to_str()
+            .map(|s| s.replace('\\', "/"))
+            .unwrap_or_else(|| "".to_string());
+
+        info!("尝试加载检测器模型: {}", resource_path_str);
+
         // 这个不用检查文件是否存在，不存在opencv会报错
         let detector = FaceDetectorYN::create(
-            resource_path.to_str().unwrap_or(""),
+            &resource_path_str,
             "",
             Size::new(320, 320), // 初始尺寸，后面会动态更新
             0.9,
@@ -132,7 +140,16 @@ pub fn init_model() -> Result<CustomResult, CustomResult> {
         let resource_path = ROOT_DIR
             .join("resources")
             .join("face_recognition_sface_2021dec.onnx");
-        let recognizer = FaceRecognizerSF::create(resource_path.to_str().unwrap_or(""), "", 0, 0)
+
+        // 标准化路径，使用正斜杠避免转义问题
+        let resource_path_str = resource_path
+            .to_str()
+            .map(|s| s.replace('\\', "/"))
+            .unwrap_or_else(|| "".to_string());
+
+        info!("尝试加载识别器模型: {}", resource_path_str);
+
+        let recognizer = FaceRecognizerSF::create(&resource_path_str, "", 0, 0)
             .map_err(|e| {
             CustomResult::error(Some(format!("初始化识别器模型失败: {:?}", e)), None)
         })?;
