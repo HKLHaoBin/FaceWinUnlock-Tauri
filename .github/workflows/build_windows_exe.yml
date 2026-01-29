@@ -150,7 +150,21 @@ jobs:
           }
 
           # 复制依赖的 DLL（如果有的话）
-          $depDlls = @("libcrypto*.dll", "libssl*.dll", "zlib*.dll")
+          $depDlls = @(
+            "libcrypto*.dll",
+            "libssl*.dll",
+            "zlib*.dll",
+            "libwebp*.dll",
+            "jpeg*.dll",
+            "libpng*.dll",
+            "tiff*.dll",
+            "libopenjp2*.dll",
+            "libprotobuf*.dll",
+            "liblzma*.dll",
+            "zstd*.dll",
+            "libiconv*.dll",
+            "libintl*.dll"
+          )
           foreach ($pattern in $depDlls) {
             $depFiles = Get-ChildItem -Path $opencvBinDir -Filter $pattern -ErrorAction SilentlyContinue
             foreach ($file in $depFiles) {
@@ -236,7 +250,21 @@ jobs:
               }
 
               # 复制依赖的 DLL
-              $depDlls = @("libcrypto*.dll", "libssl*.dll", "zlib*.dll")
+              $depDlls = @(
+                "libcrypto*.dll",
+                "libssl*.dll",
+                "zlib*.dll",
+                "libwebp*.dll",
+                "jpeg*.dll",
+                "libpng*.dll",
+                "tiff*.dll",
+                "libopenjp2*.dll",
+                "libprotobuf*.dll",
+                "liblzma*.dll",
+                "zstd*.dll",
+                "libiconv*.dll",
+                "libintl*.dll"
+              )
               foreach ($pattern in $depDlls) {
                 $depFiles = Get-ChildItem -Path $resourcesDir -Filter $pattern -ErrorAction SilentlyContinue
                 foreach ($file in $depFiles) {
