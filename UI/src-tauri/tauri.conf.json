@@ -35,9 +35,7 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "resources/FaceWinUnlock-Tauri.dll",
-      "resources/face_detection_yunet_2023mar.onnx",
-      "resources/face_recognition_sface_2021dec.onnx"
+      "resources/"
     ],
     "windows": {
       "nsis": {

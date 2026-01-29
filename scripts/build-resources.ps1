@@ -35,8 +35,39 @@ if (Test-Path $DownloadScript) {
     Write-Host "WARNING: Model download script does not exist, skipping this step" -ForegroundColor Yellow
 }
 
-# 3. OpenCV DLL will be copied automatically from vcpkg during build
-Write-Host "OpenCV DLL will be copied from vcpkg during build" -ForegroundColor Cyan
+# 3. Copy all OpenCV DLLs to resources directory
+Write-Host "Copying all OpenCV DLLs to resources directory..." -ForegroundColor Yellow
+$OpenCVBinDir = "C:\vcpkg\installed\x64-windows\bin"
+
+if (Test-Path $OpenCVBinDir) {
+    # 复制所有 opencv_*.dll
+    $opencvDlls = Get-ChildItem -Path $OpenCVBinDir -Filter "opencv_*.dll" -ErrorAction SilentlyContinue
+    foreach ($dll in $opencvDlls) {
+        Copy-Item -Path $dll.FullName -Destination $ResourcesDir -Force
+        Write-Host "  - $($dll.Name) (OpenCV 核心库)" -ForegroundColor Green
+    }
+
+    # 复制所有依赖 DLL（包括 libwebp, jpeg, zlib, libpng, libtiff, tbb 等）
+    $allDlls = Get-ChildItem -Path $OpenCVBinDir -Filter "*.dll" -ErrorAction SilentlyContinue
+
+    # 排除 OpenCV DLL（已经复制过了）和 vcpkg 自己的 DLL
+    $depDlls = $allDlls | Where-Object {
+        $_.Name -notmatch "^opencv_" -and
+        $_.Name -notmatch "^vcpkg" -and
+        $_.Name -notmatch "^msvcp" -and
+        $_.Name -notmatch "^vcruntime" -and
+        $_.Name -notmatch "^api-ms-win"
+    }
+
+    foreach ($dll in $depDlls) {
+        Copy-Item -Path $dll.FullName -Destination $ResourcesDir -Force
+        Write-Host "  - $($dll.Name) (依赖库)" -ForegroundColor Green
+    }
+
+    Write-Host "总共复制了 $($opencvDlls.Count + $depDlls.Count) 个 DLL 文件" -ForegroundColor Cyan
+} else {
+    Write-Host "WARNING: OpenCV bin directory not found at $OpenCVBinDir" -ForegroundColor Yellow
+}
 
 Write-Host "All resources prepared!" -ForegroundColor Green
 Get-ChildItem $ResourcesDir | Format-Table Name, Length, LastWriteTime
